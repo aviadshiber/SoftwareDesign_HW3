@@ -77,6 +77,56 @@ class CourseBotStaffTest {
     }
 
     @Test
+    fun `A user in the channel can ask the bot to do calculation- checking parentheses precedence`() {
+        val listener = mockk<ListenerCallback>(relaxed = true)
+
+        courseApp.login("gal", "hunter2")
+                .thenCompose { adminToken ->
+                    courseApp.channelJoin(adminToken, "#channel")
+                            .thenCompose {
+                                bots.bot().thenCompose { bot ->
+                                    bot.join("#channel")
+                                            .thenApply { bot.setCalculationTrigger("calculate") }
+                                }
+                            }
+                            .thenCompose { courseApp.login("matan", "s3kr3t") }
+                            .thenCompose { token -> courseApp.channelJoin(token, "#channel").thenApply { token } }
+                            .thenCompose { token -> courseApp.addListener(token, listener).thenApply { token } }
+                            .thenCompose { token -> courseApp.channelSend(token, "#channel", messageFactory.create(MediaType.TEXT, "calculate (20 * (2 + 2)/2)+1".toByteArray()).join()) }
+                }.join()
+
+        verify {
+            listener.invoke("#channel@matan", any())
+            listener.invoke("#channel@Anna0", match { it.contents.toString().toInt() == 21 })
+        }
+    }
+
+    @Test
+    fun `A user in the channel can ask the bot to do calculation- checking arithmetic precedence`() {
+        val listener = mockk<ListenerCallback>(relaxed = true)
+
+        courseApp.login("gal", "hunter2")
+                .thenCompose { adminToken ->
+                    courseApp.channelJoin(adminToken, "#channel")
+                            .thenCompose {
+                                bots.bot().thenCompose { bot ->
+                                    bot.join("#channel")
+                                            .thenApply { bot.setCalculationTrigger("calculate") }
+                                }
+                            }
+                            .thenCompose { courseApp.login("matan", "s3kr3t") }
+                            .thenCompose { token -> courseApp.channelJoin(token, "#channel").thenApply { token } }
+                            .thenCompose { token -> courseApp.addListener(token, listener).thenApply { token } }
+                            .thenCompose { token -> courseApp.channelSend(token, "#channel", messageFactory.create(MediaType.TEXT, "calculate 20 * 1+2 * 2/2+1".toByteArray()).join()) }
+                }.join()
+
+        verify {
+            listener.invoke("#channel@matan", any())
+            listener.invoke("#channel@Anna0", match { it.contents.toString().toInt() == ((20*1)+((2*2)/2)+1 )})
+        }
+    }
+
+    @Test
     fun `A user in the channel can tip another user`() {
         courseApp.login("gal", "hunter2")
                 .thenCompose { adminToken ->
@@ -114,8 +164,31 @@ class CourseBotStaffTest {
                 }.join()
 
         assertThat(runWithTimeout(ofSeconds(10)) {
-            bots.bot("Anna0").thenCompose { bot -> bot.count(".*hell.*worl.*") }.join()
+            bots.bot("Anna0").thenCompose { bot -> bot.count(channel = null,regex=".*hell.*worl.*")}.join()
         }, equalTo(1L))
+    }
+    @Test
+    fun `The bot accurately tracks keywords in multi channels`() {
+        courseApp.login("gal", "hunter2")
+                .thenCompose { adminToken ->
+                    courseApp.channelJoin(adminToken, "#channel1")
+                            .thenCompose { courseApp.channelJoin(adminToken, "#channel2") }
+                            .thenCompose {
+                                bots.bot()
+                                        .thenCompose { bot -> bot.join("#channel1").thenApply { bot } }
+                                        .thenCompose { bot -> bot.join("#channel2").thenApply { bot } }
+                                        .thenCompose { bot -> bot.beginCount("aa.*b") }
+                            }
+                            .thenCompose { courseApp.login("matan", "s3kr3t") }
+                            .thenCompose { token -> courseApp.channelJoin(token, "#channel1").thenApply { token } }
+                            .thenCompose { token -> courseApp.channelJoin(token, "#channel2").thenApply { token } }
+                            .thenCompose { token -> courseApp.channelSend(token, "#channel1", messageFactory.create(MediaType.TEXT, "aaacb".toByteArray()).join()).thenApply { token } }
+                            .thenCompose { token -> courseApp.channelSend(token, "#channel2", messageFactory.create(MediaType.TEXT, "aaabb".toByteArray()).join()) }
+                }.join()
+
+        assertThat(runWithTimeout(ofSeconds(10)) {
+            bots.bot("Anna0").thenCompose { bot -> bot.count(channel = null,regex="aa.*b")}.join()
+        }, equalTo(4L))
     }
 
     @Test
