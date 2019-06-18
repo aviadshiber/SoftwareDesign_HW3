@@ -10,6 +10,7 @@ import io.github.vjames19.futures.jdk8.ImmediateFuture
 import io.github.vjames19.futures.jdk8.recover
 import java.time.LocalDateTime
 import java.util.concurrent.CompletableFuture
+import kotlin.reflect.KMutableProperty1
 
 class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, private val messageFactory: MessageFactory)
     : CourseBot {
@@ -75,17 +76,24 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
     }
 
     override fun setCalculationTrigger(trigger: String?): CompletableFuture<String?> {
-        val prev = bot.calculationTrigger
-        bot.calculationTrigger = trigger
-        val triggerCallback: ListenerCallback = { source: String, message: Message ->
-            val r = "$trigger <[()\\d*+/-]+>".toRegex()
+        val regex = "$trigger <[()\\d*+/-]+>".toRegex()
+        return setCallBackTrigger(Bot::calculationTrigger, trigger, regex) { source: String, message: Message ->
             val content = String(message.contents)
-            if (isChannelName(source) && trigger != null && r matches content) {
-                val expression = r.matchEntire(content)!!.groups[1]!!.value
-                val solution = Value(expression).resolve()
-                val messageFuture = messageFactory.create(MediaType.TEXT, "$solution".toByteArray())
-                messageFuture.thenCompose { courseApp.channelSend(bot.token, source.channelName, it) }
-            } else ImmediateFuture { }
+            val expression = regex.matchEntire(content)!!.groups[1]!!.value
+            val solution = Value(expression).resolve()
+            val messageFuture = messageFactory.create(MediaType.TEXT, "$solution".toByteArray())
+            messageFuture.thenCompose { courseApp.channelSend(bot.token, source.channelName, it) }
+        }
+    }
+
+    private fun setCallBackTrigger(prop: KMutableProperty1<Bot, String?>, trigger: String?, r: Regex, action: (source: String, message: Message) -> CompletableFuture<Unit>)
+            : CompletableFuture<String?> {
+        val prev = prop.get(bot)
+        prop.set(bot, trigger)
+        val triggerCallback: ListenerCallback = { source: String, message: Message ->
+            val content = String(message.contents)
+            if (isChannelName(source) && trigger != null && r matches content) action(source, message)
+            else ImmediateFuture { }
         }
         return courseApp.addListener(bot.token, triggerCallback).thenApply { prev }
     }
@@ -158,6 +166,6 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
 
 
     internal companion object {
-        val channelNameRule: Regex = Regex("#[#_A-Za-z0-9]*")
+        val channelNameRule = "#[#_A-Za-z0-9]*".toRegex()
     }
 }
