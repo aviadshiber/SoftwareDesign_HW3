@@ -1,10 +1,8 @@
 package il.ac.technion.cs.softwaredesign
 
-import PersistentDataStructures.Tree.AVLTree
 import il.ac.technion.cs.softwaredesign.exceptions.UserAlreadyLoggedInException
 import il.ac.technion.cs.softwaredesign.messages.MessageFactory
 import il.ac.technion.cs.softwaredesign.storage.SecureStorage
-import io.github.vjames19.futures.jdk8.ImmediateFuture
 import io.github.vjames19.futures.jdk8.recover
 import java.util.concurrent.CompletableFuture
 import javax.inject.Inject
@@ -14,12 +12,12 @@ typealias  BotId = Long
 
 class CourseBotsImpl @Inject constructor(botsSecureStorage: SecureStorage
                                          , private val courseApp: CourseApp
-                                         , private val database: DataBase<String, Long>
+                                         //, private val database: DataBase<String, Long>
                                          , private val messageFactory: MessageFactory
 ) : CourseBots {
 
 
-    private val bots = AVLTree<BotId, Bot>(botsSecureStorage, "bots")
+    //private val bots = AVLTree<BotId, Bot>(botsSecureStorage, "bots")
 
     init {
 
@@ -43,11 +41,11 @@ class CourseBotsImpl @Inject constructor(botsSecureStorage: SecureStorage
     }
 
     private fun addBot(id: Long, bot: Bot): Bot {
-        bots.add(id, bot)
+       // bots.add(id, bot)
         return bot
     }
 
-    private fun getBot(id: Long) = (bots.get(id) as Bot)
+    private fun getBot(id: Long):Bot = TODO()//(bots.get(id) as Bot)
 
 
     private fun chooseBotName(name: String?, it: BotId): Pair<BotId, String> =
@@ -64,20 +62,23 @@ class CourseBotsImpl @Inject constructor(botsSecureStorage: SecureStorage
 
 
     private fun generateBotId(): CompletableFuture<BotId> {
-        return database.read(annaCounterKey).thenCompose { currentCounter ->
+        TODO()
+        /*return database.read(annaCounterKey).thenCompose { currentCounter ->
             if (currentCounter == null)
                 database.write(annaCounterKey, 0L).thenApply { 0L }
             else
                 database.write(annaCounterKey, currentCounter + 1L).thenApply { currentCounter + 1L }
-        }
+        }*/
     }
 
     override fun bots(channel: String?): CompletableFuture<List<String>> {
-        return ImmediateFuture {
-            bots.asSequence()
+        TODO()
+        /*return ImmediateFuture {
+            listOf<String>()
+           *//* bots.asSequence()
                     .filter { (_, bot) -> bot.channels.contains(channel) }
                     .map { (_, bot) -> bot.name }
-                    .toList()
-        }
+                    .toList()*//*
+        }*/
     }
 }
