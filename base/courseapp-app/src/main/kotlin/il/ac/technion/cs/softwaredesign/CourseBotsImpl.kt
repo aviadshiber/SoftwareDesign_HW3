@@ -1,22 +1,29 @@
 package il.ac.technion.cs.softwaredesign
 
 import PersistentDataStructures.Tree.AVLTree
+import il.ac.technion.cs.softwaredesign.exceptions.UserAlreadyLoggedInException
 import il.ac.technion.cs.softwaredesign.storage.SecureStorage
+import io.github.vjames19.futures.jdk8.ImmediateFuture
+import io.github.vjames19.futures.jdk8.recover
 import java.util.concurrent.CompletableFuture
 import javax.inject.Inject
 
-class CourseBotsImpl @Inject constructor(botsSecureStorage: SecureStorage, private val courseApp: CourseApp
+typealias  BotId = Long
+
+class CourseBotsImpl @Inject constructor(botsSecureStorage: SecureStorage
+                                         , private val courseApp: CourseApp
                                          , private val database: DataBase<String, Long>) : CourseBots {
 
-    val bots = AVLTree<Long, String>(botsSecureStorage, "bots")
+
+    private val bots = AVLTree<BotId, Bot>(botsSecureStorage, "bots")
 
     init {
 
     }
 
     companion object {
-        private val annaCounterKey = "botsCounter"
-        private val botDefaultName = "Anna"
+        private const val annaCounterKey = "botsCounter"
+        private const val botDefaultName = "Anna"
     }
 
     override fun bot(name: String?): CompletableFuture<CourseBot> {
@@ -24,20 +31,35 @@ class CourseBotsImpl @Inject constructor(botsSecureStorage: SecureStorage, priva
         return generateBotId().thenApply { chooseBotName(name, it) }
                 .thenCompose { (id, botName) -> loginBotFuture(botName, id) }
                 .thenApply { (token, id, botName) ->
-                    bots.add(id, botName)
-                    CourseBotImpl(token, id, botName, courseApp)//TODO: change
+                    val bot = Bot(id, token, botName)
+                    addBot(id, bot)
+                    CourseBotImpl(bot, courseApp)
                 }
 
     }
 
-    private fun chooseBotName(name: String?, it: Long): Pair<Long, String> =
+    private fun addBot(id: Long, bot: Bot): Bot {
+        bots.add(id, bot)
+        return bot
+    }
+
+    private fun getBot(id: Long) = (bots.get(id) as Bot)
+
+
+    private fun chooseBotName(name: String?, it: BotId): Pair<BotId, String> =
             if (name == null) Pair(it, "$botDefaultName$it") else Pair(it, name)
 
+
     private fun loginBotFuture(botName: String, id: Long): CompletableFuture<Triple<String, Long, String>>? =
-            courseApp.login(botName, "").thenApply { token -> Triple(token, id, botName) }
+            courseApp.login(botName, "")
+                    .recover {
+                        if (it is UserAlreadyLoggedInException)
+                            getBot(id).token
+                        else throw it
+                    }.thenApply { token -> Triple(token, id, botName) }
 
 
-    private fun generateBotId(): CompletableFuture<Long> {
+    private fun generateBotId(): CompletableFuture<BotId> {
         return database.read(annaCounterKey).thenCompose { currentCounter ->
             if (currentCounter == null)
                 database.write(annaCounterKey, 0L).thenApply { 0L }
@@ -47,7 +69,11 @@ class CourseBotsImpl @Inject constructor(botsSecureStorage: SecureStorage, priva
     }
 
     override fun bots(channel: String?): CompletableFuture<List<String>> {
-        //bots.asSequence()
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+        return ImmediateFuture {
+            bots.asSequence()
+                    .filter { (_, bot) -> bot.channels.contains(channel) }
+                    .map { (_, bot) -> bot.name }
+                    .toList()
+        }
     }
 }

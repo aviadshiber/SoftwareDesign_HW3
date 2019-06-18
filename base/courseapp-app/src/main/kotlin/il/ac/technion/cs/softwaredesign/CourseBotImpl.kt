@@ -9,22 +9,15 @@ import io.github.vjames19.futures.jdk8.recover
 import java.time.LocalDateTime
 import java.util.concurrent.CompletableFuture
 
-class CourseBotImpl(private val token: String, private val id: Long, private val name: String, private val courseApp: CourseApp)
+class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp)
     : CourseBot {
 
 
-    private val String.channelName: String
-        get() {
-            return this.substringBefore("@", "")
-        }
-    private var lastSeenMessageTime: LocalDateTime? = null
-    private val lastSeenCallback: ListenerCallback = { source: String, message: Message ->
-        ImmediateFuture {
-            if (wasNewMessageCreated(message) && isChannelName(source))
-                lastSeenMessageTime = message.created
-        }
+    /* TODO: replace by tree impl in future */
+    private fun addChannel(channelName: String) = bot.channels.add(channelName)
 
-    }
+    private fun removeChannel(channelName: String) = bot.channels.remove(channelName)
+
 
     init {
         /*
@@ -36,32 +29,47 @@ class CourseBotImpl(private val token: String, private val id: Long, private val
 
     private fun isChannelName(s: String) = channelNameRule matches s.channelName
     private fun wasNewMessageCreated(message: Message) =
-            lastSeenMessageTime == null || message.created > lastSeenMessageTime
+            bot.lastSeenMessageTime == null || message.created > bot.lastSeenMessageTime
 
     override fun join(channelName: String): CompletableFuture<Unit> {
-        return courseApp.channelJoin(token, channelName)
+        return courseApp.channelJoin(bot.token, channelName)
                 .recover { throw UserNotAuthorizedException() }
-                .thenApply { /* todo add channel to tree */ }
-                .thenCompose { courseApp.addListener(token, lastSeenCallback) }
+                .thenApply { addChannel(channelName) }
+                .thenCompose { courseApp.addListener(bot.token, lastSeenCallback) }
     }
 
     override fun part(channelName: String): CompletableFuture<Unit> {
-        return courseApp.channelPart(token, channelName)
+        //todo: clean statistics
+        return courseApp.channelPart(bot.token, channelName)
                 .recover { throw UserNotAuthorizedException() }
-                .thenApply { /* todo remove channel from tree */ }
-                .thenCompose { courseApp.removeListener(token, lastSeenCallback) }
+                .thenApply { removeChannel(channelName) }
+                .thenCompose { courseApp.removeListener(bot.token, lastSeenCallback) }
     }
+
 
     override fun channels(): CompletableFuture<List<String>> {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+        return ImmediateFuture { bot.channels } //TODO: replace with storage
     }
+
 
     override fun beginCount(regex: String?, mediaType: MediaType?): CompletableFuture<Unit> {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+        if (regex == null && mediaType == null) ImmediateFuture { throw IllegalArgumentException() }
+        val countCallback: ListenerCallback = { source: String, message: Message ->
+            if (shouldBeCounted(regex, mediaType, source, message)) {
+                getCounter(source.channelName, regex, mediaType)
+                        .thenCompose { counter ->
+                            if (counter == null) setCounter(source.channelName, regex, mediaType, 0)
+                            else setCounter(source.channelName, regex, mediaType, counter + 1)
+                        }
+
+            } else ImmediateFuture { }
+        }
+        return courseApp.addListener(bot.token, countCallback)
     }
 
+
     override fun count(channel: String?, regex: String?, mediaType: MediaType?): CompletableFuture<Long> {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+        return getCounter(channel, regex, mediaType).thenApply { it ?: throw IllegalArgumentException() }
     }
 
     override fun setCalculationTrigger(trigger: String?): CompletableFuture<String?> {
@@ -73,7 +81,7 @@ class CourseBotImpl(private val token: String, private val id: Long, private val
     }
 
     override fun seenTime(user: String): CompletableFuture<LocalDateTime?> {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+        return ImmediateFuture { bot.lastSeenMessageTime }
     }
 
     override fun mostActiveUser(channel: String): CompletableFuture<String?> {
@@ -91,6 +99,48 @@ class CourseBotImpl(private val token: String, private val id: Long, private val
     override fun surveyResults(identifier: String): CompletableFuture<List<Long>> {
         TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
     }
+
+    private val String.channelName: String
+        get() {
+            return this.substringBefore("@", "")
+        }
+
+    private val lastSeenCallback: ListenerCallback = { source: String, message: Message ->
+        ImmediateFuture {
+            if (wasNewMessageCreated(message) && isChannelName(source))
+                bot.lastSeenMessageTime = message.created
+        }
+    }
+
+    private fun shouldBeCounted(regex: String?, mediaType: MediaType?, source: String, message: Message) =
+            (isRegexMatchesMessageContent(regex, message) ||
+                    isMessageMediaTypeMatch(mediaType, message)) && isChannelName(source)
+
+    private fun isMessageMediaTypeMatch(mediaType: MediaType?, message: Message) =
+            mediaType != null && message.media == mediaType
+
+    private fun isRegexMatchesMessageContent(regex: String?, message: Message) =
+            (regex != null && Regex(regex) matches String(message.contents))
+
+
+    /**
+     * the method gets the counter from storage with the following pattern:
+     * channelName_regex_mediaType.oridinal -> counter
+     * channelName is null to count all channels (iterator over channels of bots)
+     * null is returned if no counter was initiated yet.
+     */
+    private fun getCounter(channelName: String?, regex: String?, mediaType: MediaType?): CompletableFuture<Long?> {
+        TODO("not implemented")
+    }
+
+    /**
+     * the method set the counter with of the following pattern
+     * channelName_regex_mediaType.oridinal -> x
+     */
+    private fun setCounter(channelName: String, regex: String?, mediaType: MediaType?, x: Long): CompletableFuture<Unit> {
+        TODO("not implemented")
+    }
+
 
     internal companion object {
         val channelNameRule: Regex = Regex("#[#_A-Za-z0-9]*")
