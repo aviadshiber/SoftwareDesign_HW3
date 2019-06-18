@@ -2,14 +2,16 @@ package il.ac.technion.cs.softwaredesign
 
 
 import il.ac.technion.cs.softwaredesign.exceptions.UserNotAuthorizedException
+import il.ac.technion.cs.softwaredesign.expressionsolver.Value
 import il.ac.technion.cs.softwaredesign.messages.MediaType
 import il.ac.technion.cs.softwaredesign.messages.Message
+import il.ac.technion.cs.softwaredesign.messages.MessageFactory
 import io.github.vjames19.futures.jdk8.ImmediateFuture
 import io.github.vjames19.futures.jdk8.recover
 import java.time.LocalDateTime
 import java.util.concurrent.CompletableFuture
 
-class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp)
+class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, private val messageFactory: MessageFactory)
     : CourseBot {
 
 
@@ -55,7 +57,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp)
     override fun beginCount(regex: String?, mediaType: MediaType?): CompletableFuture<Unit> {
         if (regex == null && mediaType == null) ImmediateFuture { throw IllegalArgumentException() }
         val countCallback: ListenerCallback = { source: String, message: Message ->
-            if (shouldBeCounted(regex, mediaType, source, message)) {
+            if (shouldBeCountMessage(regex, mediaType, source, message)) {
                 getCounter(source.channelName, regex, mediaType)
                         .thenCompose { counter ->
                             if (counter == null) setCounter(source.channelName, regex, mediaType, 0)
@@ -73,8 +75,21 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp)
     }
 
     override fun setCalculationTrigger(trigger: String?): CompletableFuture<String?> {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+        val prev = bot.calculationTrigger
+        bot.calculationTrigger = trigger
+        val triggerCallback: ListenerCallback = { source: String, message: Message ->
+            val r = "$trigger <[()\\d*+/-]+>".toRegex()
+            val content = String(message.contents)
+            if (isChannelName(source) && trigger != null && r matches content) {
+                val expression = r.matchEntire(content)!!.groups[1]!!.value
+                val solution = Value(expression).resolve()
+                val messageFuture = messageFactory.create(MediaType.TEXT, "$solution".toByteArray())
+                messageFuture.thenCompose { courseApp.channelSend(bot.token, source.channelName, it) }
+            } else ImmediateFuture { }
+        }
+        return courseApp.addListener(bot.token, triggerCallback).thenApply { prev }
     }
+
 
     override fun setTipTrigger(trigger: String?): CompletableFuture<String?> {
         TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
@@ -112,7 +127,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp)
         }
     }
 
-    private fun shouldBeCounted(regex: String?, mediaType: MediaType?, source: String, message: Message) =
+    private fun shouldBeCountMessage(regex: String?, mediaType: MediaType?, source: String, message: Message) =
             (isRegexMatchesMessageContent(regex, message) ||
                     isMessageMediaTypeMatch(mediaType, message)) && isChannelName(source)
 
@@ -126,7 +141,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp)
     /**
      * the method gets the counter from storage with the following pattern:
      * channelName_regex_mediaType.oridinal -> counter
-     * channelName is null to count all channels (iterator over channels of bots)
+     * channelName is null to count all channels (iterate over channels of bots)
      * null is returned if no counter was initiated yet.
      */
     private fun getCounter(channelName: String?, regex: String?, mediaType: MediaType?): CompletableFuture<Long?> {

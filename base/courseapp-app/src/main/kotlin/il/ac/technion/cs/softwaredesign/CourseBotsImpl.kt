@@ -2,17 +2,21 @@ package il.ac.technion.cs.softwaredesign
 
 import PersistentDataStructures.Tree.AVLTree
 import il.ac.technion.cs.softwaredesign.exceptions.UserAlreadyLoggedInException
+import il.ac.technion.cs.softwaredesign.messages.MessageFactory
 import il.ac.technion.cs.softwaredesign.storage.SecureStorage
 import io.github.vjames19.futures.jdk8.ImmediateFuture
 import io.github.vjames19.futures.jdk8.recover
 import java.util.concurrent.CompletableFuture
 import javax.inject.Inject
 
+
 typealias  BotId = Long
 
 class CourseBotsImpl @Inject constructor(botsSecureStorage: SecureStorage
                                          , private val courseApp: CourseApp
-                                         , private val database: DataBase<String, Long>) : CourseBots {
+                                         , private val database: DataBase<String, Long>
+                                         , private val messageFactory: MessageFactory
+) : CourseBots {
 
 
     private val bots = AVLTree<BotId, Bot>(botsSecureStorage, "bots")
@@ -33,7 +37,7 @@ class CourseBotsImpl @Inject constructor(botsSecureStorage: SecureStorage
                 .thenApply { (token, id, botName) ->
                     val bot = Bot(id, token, botName)
                     addBot(id, bot)
-                    CourseBotImpl(bot, courseApp)
+                    CourseBotImpl(bot, courseApp, messageFactory)
                 }
 
     }
