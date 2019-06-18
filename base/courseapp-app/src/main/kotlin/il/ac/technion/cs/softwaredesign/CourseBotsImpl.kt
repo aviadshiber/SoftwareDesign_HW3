@@ -10,6 +10,10 @@ class CourseBotsImpl @Inject constructor(botsSecureStorage: SecureStorage, priva
 
     val bots = AVLTree<Long, String>(botsSecureStorage, "bots")
 
+    init {
+
+    }
+
     companion object {
         private val annaCounterKey = "botsCounter"
         private val botDefaultName = "Anna"
@@ -19,9 +23,9 @@ class CourseBotsImpl @Inject constructor(botsSecureStorage: SecureStorage, priva
 
         return generateBotId().thenApply { chooseBotName(name, it) }
                 .thenCompose { (id, botName) -> loginBotFuture(botName, id) }
-                .thenApply { (id, botName) ->
+                .thenApply { (token, id, botName) ->
                     bots.add(id, botName)
-                    CourseBotImpl()//TODO: change
+                    CourseBotImpl(token, id, botName, courseApp)//TODO: change
                 }
 
     }
@@ -29,8 +33,8 @@ class CourseBotsImpl @Inject constructor(botsSecureStorage: SecureStorage, priva
     private fun chooseBotName(name: String?, it: Long): Pair<Long, String> =
             if (name == null) Pair(it, "$botDefaultName$it") else Pair(it, name)
 
-    private fun loginBotFuture(botName: String, id: Long): CompletableFuture<Pair<Long, String>> =
-            courseApp.login(botName, "").thenApply { Pair(id, botName) }
+    private fun loginBotFuture(botName: String, id: Long): CompletableFuture<Triple<String, Long, String>>? =
+            courseApp.login(botName, "").thenApply { token -> Triple(token, id, botName) }
 
 
     private fun generateBotId(): CompletableFuture<Long> {
