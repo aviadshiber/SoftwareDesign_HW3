@@ -6,8 +6,6 @@ import java.time.LocalDateTime
 import java.util.concurrent.CompletableFuture
 
 interface CourseBot {
-
-
   /**
    * Make the bot join the channel.
    *

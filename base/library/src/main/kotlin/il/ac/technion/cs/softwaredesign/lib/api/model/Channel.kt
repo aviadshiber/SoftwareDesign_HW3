@@ -10,6 +10,7 @@ class Channel: BaseModel() {
     companion object {
         const val TYPE = "channel"
         const val KEY_NAME = "name"
+        const val KEY_CHANNEL_ID = "channelId"
         /**
          * Holds the list of operators for a given channel
          *
@@ -20,8 +21,14 @@ class Channel: BaseModel() {
          *
          */
         const val LIST_USERS = "users"
+        /**
+         * Holds the list of joined bots for a given channel
+         *
+         */
+        const val LIST_BOTS = "channelBots"
     }
 
     lateinit var name: String
+    var channelId: Long = -1L
 
 }

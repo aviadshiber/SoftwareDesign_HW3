@@ -3,6 +3,10 @@ package il.ac.technion.cs.softwaredesign
 
 import il.ac.technion.cs.softwaredesign.exceptions.UserNotAuthorizedException
 import il.ac.technion.cs.softwaredesign.expressionsolver.Value
+import il.ac.technion.cs.softwaredesign.lib.api.CourseBotApi
+import il.ac.technion.cs.softwaredesign.lib.api.model.Bot
+import il.ac.technion.cs.softwaredesign.lib.api.model.BotsMetadata
+import il.ac.technion.cs.softwaredesign.lib.api.model.Channel
 import il.ac.technion.cs.softwaredesign.messages.MediaType
 import il.ac.technion.cs.softwaredesign.messages.Message
 import il.ac.technion.cs.softwaredesign.messages.MessageFactory
@@ -12,14 +16,47 @@ import java.time.LocalDateTime
 import java.util.concurrent.CompletableFuture
 import kotlin.reflect.KMutableProperty1
 
-class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, private val messageFactory: MessageFactory)
+class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, private val messageFactory: MessageFactory,
+                    private val courseBotApi: CourseBotApi
+)
     : CourseBot {
 
+    internal companion object {
+        val channelNameRule = "#[#_A-Za-z0-9]*".toRegex()
+        private const val botsMetadataName = "allBots"
+    }
 
-    /* TODO: replace by tree impl in future */
-    private fun addChannel(channelName: String) = bot.channels.add(channelName)
+    private fun createChannelIfNotExist(channelName: String): CompletableFuture<Long> {
+        return courseBotApi.findChannel(channelName)
+                .thenCompose {
+                    if (it == null) {
+                        generateChannelId()
+                            .thenCompose { id ->
+                                courseBotApi.createChannel(channelName, "courseBot", id).thenApply { id } // TODO: implement, similer to BotsImpl
+                                    .thenCompose { id ->
+                                        courseBotApi.listInsert(BotsMetadata.ALL_CHANNELS, botsMetadataName, channelName).thenApply { id }
+                                    }
+                            }
+                    }
+                    else ImmediateFuture { it.channelId }
+                }
+    }
 
-    private fun removeChannel(channelName: String) = bot.channels.remove(channelName)
+    private fun generateChannelId(): CompletableFuture<Long> {
+        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+    }
+
+    private fun addBotToChannel(channelName: String) =
+            courseBotApi.listInsert(Channel.LIST_BOTS, channelName, Pair(bot.botId, bot.botName).pairToString())
+
+    private fun removeBotFromChannel(channelName: String) =
+            courseBotApi.listRemove(Channel.LIST_BOTS, channelName, Pair(bot.botId, bot.botName).pairToString())
+
+    private fun addChannelToBot(channelName: String, channelId: Long) =
+            courseBotApi.listInsert(Bot.LIST_BOT_CHANNELS, bot.botName, Pair(channelId, channelName).pairToString())
+
+    private fun removeChannelFromBot(channelName: String, channelId: Long) =
+            courseBotApi.listRemove(Bot.LIST_BOT_CHANNELS, bot.botName, Pair(channelId, channelName).pairToString())
 
 
     init {
@@ -35,18 +72,20 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
             bot.lastSeenMessageTime == null || message.created > bot.lastSeenMessageTime
 
     override fun join(channelName: String): CompletableFuture<Unit> {
-        return courseApp.channelJoin(bot.token, channelName)
+        return courseApp.channelJoin(bot.botToken, channelName)
                 .recover { throw UserNotAuthorizedException() }
-                .thenApply { addChannel(channelName) }
-                .thenCompose { courseApp.addListener(bot.token, lastSeenCallback) } //TODO: add listener to storage
+                .thenCompose { createChannelIfNotExist(channelName) }
+                .thenCompose { channelId -> addChannelToBot(channelName, channelId) }
+                .thenCompose { addBotToChannel(channelName) }
+                .thenCompose { courseApp.addListener(bot.botToken, lastSeenCallback) } //TODO: add listener to storage
     }
 
     override fun part(channelName: String): CompletableFuture<Unit> {
         //todo: clean statistics (put null in all counters ['begin count'])
-        return courseApp.channelPart(bot.token, channelName)
+        return courseApp.channelPart(bot.botToken, channelName)
                 .recover { throw UserNotAuthorizedException() }
                 .thenApply { removeChannel(channelName) }
-                .thenCompose { courseApp.removeListener(bot.token, lastSeenCallback) } //TODO: remove listener to storage
+                .thenCompose { courseApp.removeListener(bot.botToken, lastSeenCallback) } //TODO: remove listener to storage
     }
 
 
@@ -71,7 +110,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
 
             } else ImmediateFuture { }
         }
-        return courseApp.addListener(bot.token, countCallback) //TODO: add listener to storage
+        return courseApp.addListener(bot.botToken, countCallback) //TODO: add listener to storage
     }
 
 
@@ -86,7 +125,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
             val expression = regex.matchEntire(content)!!.groups[1]!!.value
             val solution = Value(expression).resolve()
             val messageFuture = messageFactory.create(MediaType.TEXT, "$solution".toByteArray())
-            messageFuture.thenCompose { courseApp.channelSend(bot.token, source.channelName, it) }
+            messageFuture.thenCompose { courseApp.channelSend(bot.botToken, source.channelName, it) }
         }
     }
 
@@ -99,7 +138,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
             if (isChannelNameValid(source) && trigger != null && r matches content) action(source, message)
             else ImmediateFuture { }
         }
-        return courseApp.addListener(bot.token, triggerCallback).thenApply { prev } //TODO: add listener to storage
+        return courseApp.addListener(bot.botToken, triggerCallback).thenApply { prev } //TODO: add listener to storage
     }
 
 
@@ -174,7 +213,9 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
     }
 
 
-    internal companion object {
-        val channelNameRule = "#[#_A-Za-z0-9]*".toRegex()
+    private fun Pair<Long, String>.pairToString() = "$first,$second"
+    private fun String.stringToPair(): Pair<Long, String>{
+        val values = this.split(',')
+        return Pair(values[0].toLong(), values[1])
     }
 }
