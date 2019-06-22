@@ -124,62 +124,50 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
                 }
     }
 
-    private fun combineRegexMediaType(regex: String?, mediaType: MediaType?): String {
-        return Pair(mediaType?.ordinal?.toLong(), regex).pairToString()
-    }
-
-    private fun addBotPrefixToLabel(botName: String, label: String) = "$botName,$label"
-
-    private fun createNamedRegexMedia(name: String, label: String) = "$name,$label"
-    private fun extractLabelFromNamedLabel(namedLabel: String) = namedLabel.split(',')[0]
-    private fun extractNameFromNamedLabel(namedLabel: String) = namedLabel.split(',', limit = 1)[1]
+    private fun combineArgsToString(vararg values: Any?): String =
+            values.joinToString(separator = ",") { it?.toString() ?: "" }
 
     // manage list of pairs (mediaType, regex)
     // in begin - add the pair to the list, and add metadata with counter = 0
     // in update - find the pair in the list, if exist - get&update metadata to counter++
     // in init statistics - iterate over the list, get&update metadata to counter = 0, clear list
-    // TODO: fix
+    // TODO: fix according documentation
     override fun beginCount(channel: String?, regex: String?, mediaType: MediaType?): CompletableFuture<Unit> {
         if (regex == null && mediaType == null) ImmediateFuture { throw IllegalArgumentException() } //TODO: ask matan if throw without future
-        val combinedRegexMedia = combineRegexMediaType(regex, mediaType)
-        val key = "${bot.name},$combinedRegexMedia"
+        val globalBotCounterName = combineArgsToString(bot.name, regex, mediaType)
         val countCallback: ListenerCallback = { source: String, message: Message ->
             if (shouldBeCountMessage(regex, mediaType, source, message)) {
-                courseBotApi.findCounter(key)
-                        .thenCompose { counter -> courseBotApi.updateCounter(key, counter!!.value + 1L) }
+                incCounterValue(globalBotCounterName)
                         .thenCompose {
-                            val channelName = source.channelName
-                            val namedRegexMedia = createNamedRegexMedia(channelName, combinedRegexMedia)
-                            val namedKey = "${bot.name},$namedRegexMedia"
-                            courseBotApi.findCounter(namedKey)
-                                    .thenCompose { channelCounter ->
-                                        courseBotApi.updateCounter(namedKey, channelCounter!!.value + 1L)
-                                    }
-                                    .thenApply { }
+                            val channelRegexMediaCounter = combineArgsToString(bot.name, source.channelName, regex, mediaType)
+                            incCounterValue(channelRegexMediaCounter)
                         }
             } else ImmediateFuture { }
         }
         return botTreeWrapper.treeGet(Bot.LIST_BOT_CHANNELS, bot.name)
                 .thenCompose {
                     it.mapComposeList { channelName ->
-                        val namedRegexMedia = createNamedRegexMedia(channelName, combinedRegexMedia)
-                        val namedKey = "${bot.name},$namedRegexMedia"
-                        restartCounter(namedKey)
+                        val channelRegexMediaCounter = combineArgsToString(bot.name, channelName, regex, mediaType)
+                        restartCounter(channelRegexMediaCounter)
                     }
                 }
-                .thenCompose { restartCounter(key) }
+                .thenCompose { restartCounter(globalBotCounterName) }
                 .thenCompose { courseApp.addListener(bot.token, countCallback) } //TODO: add listener to storage
     }
 
+    private fun incCounterValue(counterId: String): CompletableFuture<Unit> {
+        return courseBotApi.findCounter(counterId)
+                .thenCompose { counter -> courseBotApi.updateCounter(counterId, counter!!.value + 1L) }
+                .thenApply {  }
+    }
+
     override fun count(channel: String?, regex: String?, mediaType: MediaType?): CompletableFuture<Long> {
-        val combinedRegexMedia = combineRegexMediaType(regex, mediaType)
-        val key = "${bot.name},$combinedRegexMedia"
         return if (channel == null) {
-            courseBotApi.findMetadata(botsStorageName, key).thenApply { it ?: throw IllegalArgumentException() }
+            val globalBotCounterName = combineArgsToString(bot.name, regex, mediaType)
+            courseBotApi.findCounter(globalBotCounterName).thenApply { it?.value ?: throw IllegalArgumentException() }
         } else {
-            val namedRegexMedia = createNamedRegexMedia(channel, combinedRegexMedia)
-            val namedKey = "${bot.name},$namedRegexMedia"
-            courseBotApi.findMetadata(botsStorageName, namedKey).thenApply { it ?: throw IllegalArgumentException() }
+            val channelRegexMediaCounter = combineArgsToString(bot.name, channel, regex, mediaType)
+            courseBotApi.findCounter(channelRegexMediaCounter).thenApply { it?.value ?: throw IllegalArgumentException() }
         }
     }
 
