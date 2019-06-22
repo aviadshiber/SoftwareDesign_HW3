@@ -23,11 +23,14 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
 )
     : CourseBot {
 
+
     internal companion object {
         val channelNameRule = "#[#_A-Za-z0-9]*".toRegex()
         private const val botsMetadataName = "allBots"
         private const val botsStorageName = "botsStorage"
     }
+
+
 
     init {
         /*
@@ -139,7 +142,7 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
     // in begin - add the pair to the list, and add metadata with counter = 0
     // in update - find the pair in the list, if exist - get&update metadata to counter++
     // in init statistics - iterate over the list, get&update metadata to counter = 0, clear list
-    override fun beginCount(regex: String?, mediaType: MediaType?): CompletableFuture<Unit> {
+    override fun beginCount(channel: String?, regex: String?, mediaType: MediaType?): CompletableFuture<Unit> {
         if (regex == null && mediaType == null) ImmediateFuture { throw IllegalArgumentException() } //TODO: ask matan if throw without future
         val combinedRegexMedia = combineRegexMediaType(regex, mediaType)
         val key = "${bot.name},$combinedRegexMedia"
@@ -204,7 +207,21 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
     }
 
     override fun setTipTrigger(trigger: String?): CompletableFuture<String?> {
-        TODO("not implemented")
+        val regex = "$trigger <[\\d]+> <.*>".toRegex() //$trigger $number $user
+        return setCallBackTrigger(BotClient::tipTrigger, trigger, regex) { source: String, message: Message ->
+            val content = String(message.contents)
+            val number = regex.matchEntire(content)!!.groups[1]!!.value
+            val destUserName = regex.matchEntire(content)!!.groups[2]!!.value
+            val channelName= source.channelName
+            courseApp.isUserInChannel(bot.token,channelName ,destUserName).thenCompose { isDestInChannel->
+                if(isDestInChannel==true){
+                    val cashBalance=CashBalance(channelName,bot.name)
+                    cashBalance.moveTo(source.sender,destUserName,number.toLong())
+                }else{
+                    ImmediateFuture { }
+                }
+            }
+        }
     }
 
     override fun seenTime(user: String): CompletableFuture<LocalDateTime?> {
@@ -230,6 +247,10 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
     private val String.channelName: String
         get() {
             return this.substringBefore("@", "")
+        }
+    private val String.sender: String
+        get() {
+            return this.substringAfter("@", "")
         }
 
     private val lastSeenCallback: ListenerCallback = { source: String, message: Message ->

@@ -32,6 +32,16 @@ data class BotClient constructor(val id: Long, val token: String, val name: Stri
             courseBotApi.updateBot(name, Pair(Bot.KEY_BOT_CALCULATION_TRIGGER, valueToWrite)).thenApply { }.join()
         }
 
+    var tipTrigger: String?
+        get() {
+            return courseBotApi.findBot(name).thenApply { it!!.tipTrigger }
+                    .thenApply { if (it == invalid_value) null else it }.join()
+        }
+        set(value) {
+            val valueToWrite = value ?: invalid_value
+            courseBotApi.updateBot(name, Pair(Bot.KEY_BOT_TIP_TRIGGER, valueToWrite)).thenApply { }.join()
+        }
+
 
     //val channels = mutableListOf<String>()
 
