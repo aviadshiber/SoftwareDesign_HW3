@@ -62,7 +62,7 @@ class CourseBotApi @javax.inject.Inject constructor(private val db: Database) {
      * @param id Long
      * @param name String
      * @param token String
-     * @param lastSeenMessageTime LocalDateTime
+     * @param lastSeenMessageTime String
      * @param calculationTrigger String
      * @return CompletableFuture<Bot?>
      */
