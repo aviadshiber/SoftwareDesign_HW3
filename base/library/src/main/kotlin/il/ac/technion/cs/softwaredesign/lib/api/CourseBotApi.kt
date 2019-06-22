@@ -98,18 +98,18 @@ class CourseBotApi @javax.inject.Inject constructor(private val db: Database) {
                 .executeFor(Channel::class.java)
     }
 
-    fun createChannel(name: String, creator: String, id: Long): CompletableFuture<Channel> {
+    fun createChannel(name: String, /*creator: String,*/ id: Long): CompletableFuture<Channel> {
         return db.document(Channel.TYPE)
                 .create(name)
                 .set(Channel.KEY_NAME, name)
                 .set(Channel.KEY_CHANNEL_ID, id)
                 .executeFor(Channel::class.java)
-                .thenCompose { channel -> db.list(Channel.LIST_USERS, name).insert(creator).thenApply { channel } }
-                .thenCompose { channel -> db.list(Channel.LIST_OPERATORS, name).insert(creator).thenApply { channel } }
+                //.thenCompose { channel -> db.list(Channel.LIST_USERS, name).insert(creator).thenApply { channel } }
+                //.thenCompose { channel -> db.list(Channel.LIST_OPERATORS, name).insert(creator).thenApply { channel } }
                 //.thenCompose { channel -> db.list(Channel.LIST_BOTS, name).insert(creator).thenApply { channel } }
-                .thenForward(updateMetadataBy(USERS_BY_CHANNELS, creator, 1))
-                .thenForward(createMetadata(CHANNELS_BY_USERS, name, 0))
-                .thenForward(createMetadata(CHANNELS_BY_ONLINE_USERS, name, 0))
+                //.thenForward(updateMetadataBy(USERS_BY_CHANNELS, creator, 1))
+                //.thenForward(createMetadata(CHANNELS_BY_USERS, name, 0))
+                //.thenForward(createMetadata(CHANNELS_BY_ONLINE_USERS, name, 0))
                 .thenApply { it!! }
     }
 

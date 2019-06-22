@@ -18,7 +18,7 @@ typealias  BotId = Long
 class CourseBotsImpl @Inject constructor(botsSecureStorage: SecureStorage,
                                          private val courseApp: CourseApp,
                                          //, private val database: DataBase<String, Long>
-                                         private val courseBotApi: CourseBotApi,
+                                         private val courseBotApi: CourseBotApi, // TODO: should be a singleton
                                          private val messageFactory: MessageFactory
 ) : CourseBots {
 
@@ -39,10 +39,24 @@ class CourseBotsImpl @Inject constructor(botsSecureStorage: SecureStorage,
                 .thenApply { bot -> CourseBotImpl(bot!!, courseApp, messageFactory, courseBotApi) }
     }
 
-    private fun Pair<Long, String>.pairToString() = "$first,$second"
-    private fun String.stringToPair(): Pair<Long, String>{
+    private fun Pair<Long?, String?>.pairToString(): String {
+        return when {
+            first == null && second == null -> ","
+            first == null -> ",$second"
+            second == null -> "$first,"
+            else -> "$first,$second"
+        }
+    }
+    private fun String.stringToPair(): Pair<Long?, String?>{
         val values = this.split(',')
-        return Pair(values[0].toLong(), values[1])
+        val first = values[0]
+        val second = values[1]
+        return when {
+            first == "" && second == "" -> Pair(null, null)
+            first == "" -> Pair(null, second)
+            second == "" -> Pair(first.toLong(), null)
+            else -> Pair(first.toLong(), second)
+        }
     }
 
     private fun getBot(name: String): CompletableFuture<Bot?> {
@@ -65,12 +79,12 @@ class CourseBotsImpl @Inject constructor(botsSecureStorage: SecureStorage,
             courseApp.login(botName, "").thenApply { token: String -> Triple(token, id, botName) }
 
     private fun generateBotId(): CompletableFuture<Long> {
-        return courseBotApi.findMetadata(BotsMetadata.KEY_LAST_BOT_ID, botDefaultName)
+        return courseBotApi.findMetadata(BotsMetadata.KEY_LAST_BOT_ID, botsMetadataName)
                 .thenCompose { currId ->
                     if (currId == null)
-                        courseBotApi.createMetadata(BotsMetadata.KEY_LAST_BOT_ID, botDefaultName, 0L).thenApply { 0L }
+                        courseBotApi.createMetadata(BotsMetadata.KEY_LAST_BOT_ID, botsMetadataName, 0L).thenApply { 0L }
                     else
-                        courseBotApi.updateMetadata(BotsMetadata.KEY_LAST_BOT_ID, botDefaultName, currId+1L)
+                        courseBotApi.updateMetadata(BotsMetadata.KEY_LAST_BOT_ID, botsMetadataName, currId+1L)
                             .thenApply { currId+1L } }
     }
 
@@ -80,14 +94,14 @@ class CourseBotsImpl @Inject constructor(botsSecureStorage: SecureStorage,
             return if (channel == null)
                 courseBotApi.listGet(BotsMetadata.ALL_BOTS, botsMetadataName)
                         .thenApply { lst ->
-                            lst.map{it.stringToPair().second}
+                            lst.map{it.stringToPair().second!!}
                         }
             else
                 courseBotApi.findChannel(channel)
                 .thenCompose { channelObj ->
                     courseBotApi.listGet(Channel.LIST_BOTS, channel)
                             .thenApply { lst ->
-                                lst.map{it.stringToPair().second}
+                                lst.map{it.stringToPair().second!!}
                             }
                 }
     }

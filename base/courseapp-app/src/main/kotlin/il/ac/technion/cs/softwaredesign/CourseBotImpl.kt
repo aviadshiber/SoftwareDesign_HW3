@@ -1,12 +1,14 @@
 package il.ac.technion.cs.softwaredesign
 
 
+import il.ac.technion.cs.softwaredesign.exceptions.NoSuchEntityException
 import il.ac.technion.cs.softwaredesign.exceptions.UserNotAuthorizedException
 import il.ac.technion.cs.softwaredesign.expressionsolver.Value
 import il.ac.technion.cs.softwaredesign.lib.api.CourseBotApi
 import il.ac.technion.cs.softwaredesign.lib.api.model.Bot
 import il.ac.technion.cs.softwaredesign.lib.api.model.BotsMetadata
 import il.ac.technion.cs.softwaredesign.lib.api.model.Channel
+import il.ac.technion.cs.softwaredesign.lib.utils.mapComposeList
 import il.ac.technion.cs.softwaredesign.messages.MediaType
 import il.ac.technion.cs.softwaredesign.messages.Message
 import il.ac.technion.cs.softwaredesign.messages.MessageFactory
@@ -26,26 +28,45 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
         private const val botsMetadataName = "allBots"
     }
 
+    init {
+        /*
+        TODO: 1.load all listeners from storage
+              2.use tree for channels bot is in
+
+         */
+    }
+
+    // TODO: 2 options: list insert will get id.toString() or channel name
+    // if name - long name can be a problem
+    // if id - we need to cast it back to name
     private fun createChannelIfNotExist(channelName: String): CompletableFuture<Long> {
         return courseBotApi.findChannel(channelName)
-                .thenCompose {
-                    if (it == null) {
-                        generateChannelId()
-                            .thenCompose { id ->
-                                courseBotApi.createChannel(channelName, "courseBot", id).thenApply { id } // TODO: implement, similer to BotsImpl
-                                    .thenCompose { id ->
-                                        courseBotApi.listInsert(BotsMetadata.ALL_CHANNELS, botsMetadataName, channelName).thenApply { id }
-                                    }
-                            }
-                    }
-                    else ImmediateFuture { it.channelId }
+            .thenCompose {
+                if (it == null) {
+                    generateChannelId()
+                        .thenCompose { id ->
+                            courseBotApi.createChannel(channelName, id).thenApply { id }
+                        }.thenCompose { id ->
+                            courseBotApi.listInsert(BotsMetadata.ALL_CHANNELS, botsMetadataName, channelName).thenApply { id }
+                        }
                 }
+                else ImmediateFuture { it.channelId }
+            }
     }
+
+    private fun getChannelId(channelName: String) = courseBotApi.findChannel(channelName).thenApply { it!!.channelId }
 
     private fun generateChannelId(): CompletableFuture<Long> {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+        return courseBotApi.findMetadata(BotsMetadata.KEY_LAST_CHANNEL_ID, botsMetadataName)
+                .thenCompose { currId ->
+                    if (currId == null)
+                        courseBotApi.createMetadata(BotsMetadata.KEY_LAST_CHANNEL_ID, botsMetadataName, 0L).thenApply { 0L }
+                    else
+                        courseBotApi.updateMetadata(BotsMetadata.KEY_LAST_CHANNEL_ID, botsMetadataName, currId+1L)
+                                .thenApply { currId+1L } }
     }
 
+    // insert pair of (id, name) to keep the list sorted by generation time
     private fun addBotToChannel(channelName: String) =
             courseBotApi.listInsert(Channel.LIST_BOTS, channelName, Pair(bot.botId, bot.botName).pairToString())
 
@@ -58,16 +79,8 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
     private fun removeChannelFromBot(channelName: String, channelId: Long) =
             courseBotApi.listRemove(Bot.LIST_BOT_CHANNELS, bot.botName, Pair(channelId, channelName).pairToString())
 
-
-    init {
-        /*
-        TODO: 1.load all listeners from storage
-              2.use tree for channels bot is in
-
-         */
-    }
-
     private fun isChannelNameValid(s: String) = channelNameRule matches s.channelName
+
     private fun isNewMessageByCreationTime(message: Message) =
             bot.lastSeenMessageTime == null || message.created > bot.lastSeenMessageTime
 
@@ -82,39 +95,78 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
 
     override fun part(channelName: String): CompletableFuture<Unit> {
         //todo: clean statistics (put null in all counters ['begin count'])
+        // TOOD: which statistics exactly?
         return courseApp.channelPart(bot.botToken, channelName)
-                .recover { throw UserNotAuthorizedException() }
-                .thenApply { removeChannel(channelName) }
-                .thenCompose { courseApp.removeListener(bot.botToken, lastSeenCallback) } //TODO: remove listener to storage
+                .recover { throw NoSuchEntityException() }
+                // channel must be exist at this point
+                .thenCompose { getChannelId(channelName) }
+                .thenCompose { channelId -> removeChannelFromBot(channelName, channelId) }
+                .thenCompose { removeBotFromChannel(channelName) }
+                .thenCompose { courseApp.removeListener(bot.botToken, lastSeenCallback) } //TODO: remove listener from storage
     }
-
 
     override fun channels(): CompletableFuture<List<String>> {
-        return ImmediateFuture { bot.channels } //TODO: replace with storage
+        return courseBotApi.listGet(Bot.LIST_BOT_CHANNELS, bot.botName)
     }
 
+    private fun addToListIfNotExist(label: String, key: String, value: String): CompletableFuture<Unit> {
+        return courseBotApi.listContains(label, key, value)
+                .thenCompose {  if (!it) courseBotApi.listInsert(label, key, value)
+                                else ImmediateFuture { Unit }}
+    }
 
+    private fun restartMetadata(label: String, key: String): CompletableFuture<Unit> {
+        return courseBotApi.findMetadata(label, key)
+                .thenCompose {
+                    if (it == null) courseBotApi.createMetadata(label, key, 0L)
+                    else courseBotApi.updateMetadata(label, key, 0L)
+                }
+    }
+
+    private fun getLabelFromRegexMediaType(regex: String?, mediaType: MediaType?): String {
+        return Pair(mediaType?.ordinal?.toLong(), regex).pairToString()
+    }
+
+    private fun extractChannelNameFromSource(source: String): String = source.split('@')[0]
+
+    // manage list of pairs (regex, mediaType)
+    // in begin - add the pair to the list, and add metadata with counter = 0
+    // in update - find the pair in the list, if exist - get&update metadata to counter++
+    // in init statistics - iterate over the list, get&update metadata to counter = 0, clear list
     override fun beginCount(regex: String?, mediaType: MediaType?): CompletableFuture<Unit> {
-
         //todo: iterator over all channels and setCounter to zero
-
         if (regex == null && mediaType == null) ImmediateFuture { throw IllegalArgumentException() } //TODO: ask matan if throw without future
+        val label = getLabelFromRegexMediaType(regex, mediaType)
         val countCallback: ListenerCallback = { source: String, message: Message ->
             if (shouldBeCountMessage(regex, mediaType, source, message)) {
-                getCounter(source.channelName, regex, mediaType)
-                        .thenCompose { counter ->
-                            // if (counter == null) setCounter(source.channelName, regex, mediaType, 1)
-                            //else
-                            setCounter(source.channelName, regex, mediaType, counter!! + 1)
+                courseBotApi.findMetadata(label, bot.botName)
+                        .thenCompose { counter -> courseBotApi.updateMetadata(label, bot.botName, counter!! + 1L) }
+                        .thenCompose {
+                            val channelName = extractChannelNameFromSource(source)
+                            courseBotApi.findMetadata(label, channelName)
+                                    .thenCompose { channelCounter -> courseBotApi.updateMetadata(label, channelName, channelCounter!! + 1L) }
                         }
-
             } else ImmediateFuture { }
         }
-        return courseApp.addListener(bot.botToken, countCallback) //TODO: add listener to storage
+        return courseBotApi.listGet(Bot.LIST_BOT_CHANNELS, bot.botName)
+                .thenCompose {
+                    it.mapComposeList<String, Unit>{ channelName ->
+                        addToListIfNotExist(Channel.LIST_CHANNEL_MSG_COUNTERS, channelName, label)
+                                .thenCompose { restartMetadata(label, channelName) }
+                    }
+                }
+                .thenCompose { addToListIfNotExist(Bot.LIST_MSG_COUNTERS_SETTINGS, bot.botName, label) }
+                .thenCompose { restartMetadata(label, bot.botName) }
+                .thenCompose { courseApp.addListener(bot.botToken, countCallback) } //TODO: add listener to storage
     }
 
 
     override fun count(channel: String?, regex: String?, mediaType: MediaType?): CompletableFuture<Long> {
+        if (channel == null) {
+            // get sum of counters of all bot's channel
+        } else {
+            // get counter of current channel
+        }
         return getCounter(channel, regex, mediaType).thenApply { it ?: throw IllegalArgumentException() }
     }
 
@@ -213,9 +265,23 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
     }
 
 
-    private fun Pair<Long, String>.pairToString() = "$first,$second"
-    private fun String.stringToPair(): Pair<Long, String>{
+    private fun Pair<Long?, String?>.pairToString(): String {
+        return when {
+            first == null && second == null -> ","
+            first == null -> ",$second"
+            second == null -> "$first,"
+            else -> "$first,$second"
+        }
+    }
+    private fun String.stringToPair(): Pair<Long?, String?>{
         val values = this.split(',')
-        return Pair(values[0].toLong(), values[1])
+        val first = values[0]
+        val second = values[1]
+        return when {
+            first == "" && second == "" -> Pair(null, null)
+            first == "" -> Pair(null, second)
+            second == "" -> Pair(first.toLong(), null)
+            else -> Pair(first.toLong(), second)
+        }
     }
 }

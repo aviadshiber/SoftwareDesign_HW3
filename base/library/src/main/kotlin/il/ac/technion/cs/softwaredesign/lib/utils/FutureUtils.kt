@@ -1,5 +1,6 @@
 package il.ac.technion.cs.softwaredesign.lib.utils
 
+import io.github.vjames19.futures.jdk8.ImmediateFuture
 import java.util.concurrent.CompletableFuture
 
 /**
@@ -24,4 +25,12 @@ fun <T> CompletableFuture<T>.thenForward(block: (T)->Unit) : CompletableFuture<T
  */
 fun <T> CompletableFuture<T>.thenDispose(): CompletableFuture<Unit> {
     return thenApply { }
+}
+
+fun <T, U> List<T>.mapComposeList(transform: (T) -> CompletableFuture<U>): CompletableFuture<Unit> {
+    return if (this.isNotEmpty())
+        this.map { value -> transform(value) }
+                .reduce { acc, completableFuture -> acc.thenCompose { completableFuture } }
+                .thenApply { Unit }
+    else ImmediateFuture { Unit }
 }

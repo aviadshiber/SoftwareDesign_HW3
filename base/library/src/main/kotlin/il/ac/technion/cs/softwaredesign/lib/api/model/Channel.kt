@@ -26,6 +26,8 @@ class Channel: BaseModel() {
          *
          */
         const val LIST_BOTS = "channelBots"
+
+        const val LIST_CHANNEL_MSG_COUNTERS = "channelMsgCounters"
     }
 
     lateinit var name: String
