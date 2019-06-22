@@ -7,9 +7,7 @@ import il.ac.technion.cs.softwaredesign.lib.api.model.BotsMetadata
 import il.ac.technion.cs.softwaredesign.lib.api.model.Channel
 import il.ac.technion.cs.softwaredesign.messages.MessageFactory
 import il.ac.technion.cs.softwaredesign.storage.SecureStorage
-import io.github.vjames19.futures.jdk8.recover
 import io.github.vjames19.futures.jdk8.recoverWith
-import java.time.LocalDateTime
 import java.util.concurrent.CompletableFuture
 import javax.inject.Inject
 
@@ -37,7 +35,7 @@ class CourseBotsImpl @Inject constructor(botsSecureStorage: SecureStorage,
                 .thenCompose { (token, id, botName) -> courseBotApi.createBot(botName, token, id) }
                 // TODO: we need sorted tree according id... check if this key is valid for this purpose (we need string as list values)
                 .thenCompose { bot -> courseBotApi.listInsert(BotsMetadata.ALL_BOTS, botsMetadataName, Pair(bot!!.botId, bot.botName).pairToString()).thenApply { bot } }
-                .thenApply { bot -> CourseBotImpl(bot!!, courseApp, messageFactory, courseBotApi) }
+                .thenApply { bot -> CourseBotImpl(BotClient(bot!!.botId, bot.botToken, bot.botName, courseBotApi), courseApp, messageFactory, courseBotApi) }
     }
 
     private fun Pair<Long?, String?>.pairToString(): String {

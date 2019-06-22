@@ -154,7 +154,7 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
         }
         return courseBotApi.listGet(Bot.LIST_BOT_CHANNELS, bot.name)
                 .thenCompose {
-                    it.mapComposeList<String, Unit>{ channelName ->
+                    it.mapComposeList { channelName ->
                         val namedLabel =  createNamedLabelFromLabel(channelName, label)
                         restartMetadata(namedLabel, bot.name)
                     }
