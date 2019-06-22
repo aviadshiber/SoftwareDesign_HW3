@@ -20,6 +20,7 @@ import java.time.LocalDateTime
 import java.util.concurrent.CompletableFuture
 import kotlin.reflect.KMutableProperty1
 
+
 class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp, private val messageFactory: MessageFactory,
                     private val courseBotApi: CourseBotApi
 )
@@ -31,10 +32,12 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
         private const val botsMetadataName = "allBots"
         private const val botsStorageName = "botsStorage"
         const val KEY_LAST_CHANNEL_ID = "lastChannelId"
+        private const val msgCounterTreeType = "msgCounter"
     }
 
     private val channelTreeWrapper: TreeWrapper = TreeWrapper(courseBotApi, "channel_")
     private val botTreeWrapper: TreeWrapper = TreeWrapper(courseBotApi, "bot_")
+    private val msgCounterKeysTreeWrapper: TreeWrapper = TreeWrapper(courseBotApi, "msg_")
     init {
         /*
         TODO: 1.load all listeners from storage
@@ -109,6 +112,8 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
                 .thenCompose { getChannelId(channelName) }
                 .thenCompose { channelId -> removeChannelFromBot(channelName, channelId) }
                 .thenCompose { removeBotFromChannel(channelName) }
+                .thenCompose { courseBotApi.treeGet(msgCounterTreeType, bot.name) }
+                .thenCompose { counters -> counters.mapComposeList { counterId -> restartCounter(counterId) } }
                 .thenCompose { courseApp.removeListener(bot.token, lastSeenCallback) } //TODO: remove listener from storage
     }
 
@@ -149,6 +154,8 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
                     it.mapComposeList { channelName ->
                         val channelRegexMediaCounter = combineArgsToString(bot.name, channelName, regex, mediaType)
                         restartCounter(channelRegexMediaCounter)
+                                .thenApply { channelRegexMediaCounter }
+                                .thenCompose { counterId->courseBotApi.treeInsert(msgCounterTreeType, bot.name, GenericKeyPair(0L, counterId)) }
                     }
                 }
                 .thenCompose { restartCounter(globalBotCounterName) }

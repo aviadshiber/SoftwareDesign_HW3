@@ -142,8 +142,18 @@ class CourseBotApi @javax.inject.Inject constructor(private val db: Database) {
         return db.document(Counter.TYPE)
                 .find(id, keys)
                 .executeFor(Counter::class.java)
+// no need because we have delete function
+//                .thenApply {
+//                    if (it == null || it.value == -1L) null
+//                    else it
+//                }
     }
 
+    fun deleteCounter(id: String): CompletableFuture<Counter?> {
+        return db.document(Counter.TYPE)
+                .delete(id, listOf())
+                .executeFor(Counter::class.java)
+    }
 
     /**
      * Insert a value to a list
