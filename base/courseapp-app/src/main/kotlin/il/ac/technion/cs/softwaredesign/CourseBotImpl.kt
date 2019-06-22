@@ -143,6 +143,43 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
         }
     }
 
+    private fun buildBeginCountCallback(botName: String, channelName: String?, regex: String?, mediaType: MediaType?): ListenerCallback {
+        val globalBotCounterName = combineArgsToString(botName, regex, mediaType)
+            return { source: String, message: Message ->
+                isValidRegistration(botName, source, channelName).thenCompose {
+                    if (!it || !shouldBeCountMessage(regex, mediaType, source, message)) ImmediateFuture { Unit }
+                    else {
+                        if (channelName == null) {
+                            incCounterValue(globalBotCounterName)!!.thenApply {  }
+                        } else {
+                            val channelRegexMediaCounter = combineArgsToString(botName, source.channelName, regex, mediaType)
+                            incCounterValue(channelRegexMediaCounter)!!.thenApply { }
+                        }
+                    }
+                }
+            }
+    }
+
+    private fun beginCountCountersInit(botName: String, channelName: String?, regex: String?, mediaType: MediaType?): CompletableFuture<Unit> {
+        val globalBotCounterName = combineArgsToString(botName, regex, mediaType)
+        return if (channelName == null) {
+            restartCounter(globalBotCounterName)
+                    .thenCompose { courseBotApi.treeInsert(msgCounterTreeType, botName, GenericKeyPair(0L, globalBotCounterName)) }.thenApply {  }
+        } else {
+            val channelRegexMediaCounter = combineArgsToString(botName, channelName, regex, mediaType)
+            restartCounter(channelRegexMediaCounter)
+                    .thenCompose { courseBotApi.treeInsert(msgCounterTreeType, botName, GenericKeyPair(0L, channelRegexMediaCounter)) }.thenApply {  }
+        }
+    }
+
+    // TODO: check if ok
+    private fun isValidRegistration(botName: String, source: String, channelName: String?): CompletableFuture<Boolean> {
+        val sourceChannelName = source.channelName
+        if (!isChannelNameValid(sourceChannelName) || (channelName!=null && sourceChannelName != channelName)) return ImmediateFuture { false }
+        return courseBotApi.findChannel(sourceChannelName).thenApply { it!!.channelId }
+                .thenCompose { channelId->botTreeWrapper.treeContains(Bot.LIST_BOT_CHANNELS, bot.name, GenericKeyPair(channelId, sourceChannelName))}
+    }
+
     override fun part(channelName: String): CompletableFuture<Unit> {
         //todo: clean statistics (put null in all counters ['begin count'])
         // TOOD: which statistics exactly?
@@ -179,27 +216,9 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
     // in init statistics - iterate over the list, get&update metadata to counter = 0, clear list
     // TODO: fix according documentation
     override fun beginCount(channel: String?, regex: String?, mediaType: MediaType?): CompletableFuture<Unit> {
-        if (regex == null && mediaType == null) ImmediateFuture { throw IllegalArgumentException() } //TODO: ask matan if throw without future
-        val globalBotCounterName = combineArgsToString(bot.name, regex, mediaType)
-        val countCallback: ListenerCallback = { source: String, message: Message ->
-            if (shouldBeCountMessage(regex, mediaType, source, message)) {
-                incCounterValue(globalBotCounterName)!!
-                        .thenCompose {
-                            val channelRegexMediaCounter = combineArgsToString(bot.name, source.channelName, regex, mediaType)
-                            incCounterValue(channelRegexMediaCounter)!!.thenApply {  }
-                        }
-            } else ImmediateFuture { }
-        }
-        return botTreeWrapper.treeGet(Bot.LIST_BOT_CHANNELS, bot.name)
-                .thenCompose {
-                    it.mapComposeList { channelName ->
-                        val channelRegexMediaCounter = combineArgsToString(bot.name, channelName, regex, mediaType)
-                        restartCounter(channelRegexMediaCounter)
-                                .thenApply { channelRegexMediaCounter }
-                                .thenCompose { counterId->courseBotApi.treeInsert(msgCounterTreeType, bot.name, GenericKeyPair(0L, counterId)) }
-                    }
-                }
-                .thenCompose { restartCounter(globalBotCounterName) }
+        if (regex == null && mediaType == null) throw IllegalArgumentException()
+        val countCallback: ListenerCallback = buildBeginCountCallback(bot.name, channel, regex, mediaType)
+        return beginCountCountersInit(bot.name, channel, regex, mediaType)
                 .thenCompose { courseApp.addListener(bot.token, countCallback) } //TODO: add listener to storage
     }
 
