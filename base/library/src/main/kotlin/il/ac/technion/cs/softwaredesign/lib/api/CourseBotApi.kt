@@ -1,6 +1,7 @@
 package il.ac.technion.cs.softwaredesign.lib.api
 
 import il.ac.technion.cs.softwaredesign.lib.api.model.*
+import il.ac.technion.cs.softwaredesign.lib.db.Counter
 import il.ac.technion.cs.softwaredesign.lib.db.Database
 import il.ac.technion.cs.softwaredesign.lib.db.dal.GenericKeyPair
 import il.ac.technion.cs.softwaredesign.lib.utils.generateToken
@@ -121,6 +122,28 @@ class CourseBotApi @javax.inject.Inject constructor(private val db: Database) {
                 //.thenCompose { channel -> deleteMetadata(CHANNELS_BY_USERS,name).thenApply { channel } }
                 //.thenCompose { channel -> deleteMetadata(CHANNELS_BY_ONLINE_USERS, name).thenApply { channel }}
     }
+
+    fun createCounter(id: String): CompletableFuture<Counter?> {
+        return db.document(Counter.TYPE)
+                .create(id)
+                .set(Counter.KEY_VALUE, 0L)
+                .executeFor(Counter::class.java)
+    }
+
+    fun updateCounter(id: String, value: Long): CompletableFuture<Counter?> {
+        return db.document(Counter.TYPE)
+                .update(id)
+                .set(Counter.KEY_VALUE, value)
+                .executeFor(Counter::class.java)
+    }
+
+    fun findCounter(id: String): CompletableFuture<Counter?> {
+        val keys = listOf(Counter.KEY_VALUE)
+        return db.document(Counter.TYPE)
+                .find(id, keys)
+                .executeFor(Counter::class.java)
+    }
+
 
     /**
      * Insert a value to a list

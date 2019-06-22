@@ -1,8 +1,9 @@
 package il.ac.technion.cs.softwaredesign.lib.api
 
-import com.google.inject.Inject
-import com.google.inject.Provider
-import il.ac.technion.cs.softwaredesign.lib.api.model.*
+import il.ac.technion.cs.softwaredesign.lib.api.model.Channel
+import il.ac.technion.cs.softwaredesign.lib.api.model.Session
+import il.ac.technion.cs.softwaredesign.lib.api.model.User
+import il.ac.technion.cs.softwaredesign.lib.api.model.UsersMetadata
 import il.ac.technion.cs.softwaredesign.lib.api.model.UsersMetadata.Companion.CHANNELS_BY_ONLINE_USERS
 import il.ac.technion.cs.softwaredesign.lib.api.model.UsersMetadata.Companion.CHANNELS_BY_USERS
 import il.ac.technion.cs.softwaredesign.lib.api.model.UsersMetadata.Companion.USERS_BY_CHANNELS
@@ -10,8 +11,6 @@ import il.ac.technion.cs.softwaredesign.lib.db.Database
 import il.ac.technion.cs.softwaredesign.lib.utils.generateToken
 import il.ac.technion.cs.softwaredesign.lib.utils.hashPassword
 import il.ac.technion.cs.softwaredesign.lib.utils.thenForward
-import java.lang.IllegalStateException
-import java.time.ZoneId
 import java.util.*
 import java.util.concurrent.CompletableFuture
 
@@ -124,6 +123,7 @@ class CourseAppAPI @javax.inject.Inject constructor(private val db: Database) {
                 .thenCompose { channel -> deleteMetadata(CHANNELS_BY_USERS,name).thenApply { channel } }
                 .thenCompose { channel -> deleteMetadata(CHANNELS_BY_ONLINE_USERS, name).thenApply { channel }}
     }
+
 
     /**
      * Insert a value to a list

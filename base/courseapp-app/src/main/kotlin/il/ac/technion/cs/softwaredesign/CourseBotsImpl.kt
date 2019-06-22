@@ -7,7 +7,6 @@ import il.ac.technion.cs.softwaredesign.lib.api.model.BotsMetadata
 import il.ac.technion.cs.softwaredesign.lib.api.model.Channel
 import il.ac.technion.cs.softwaredesign.lib.db.dal.GenericKeyPair
 import il.ac.technion.cs.softwaredesign.messages.MessageFactory
-import il.ac.technion.cs.softwaredesign.storage.SecureStorage
 import io.github.vjames19.futures.jdk8.recoverWith
 import java.util.concurrent.CompletableFuture
 import javax.inject.Inject
@@ -29,6 +28,7 @@ class CourseBotsImpl @Inject constructor(private val courseApp: CourseApp,
     companion object {
         private const val botDefaultName = "Anna"
         private const val botsMetadataName = "allBots"
+        const val KEY_LAST_BOT_ID = "lastBotId"
     }
 
     override fun prepare(): CompletableFuture<Unit> {
@@ -57,18 +57,19 @@ class CourseBotsImpl @Inject constructor(private val courseApp: CourseApp,
 
     private fun loginBotIfNotExistFuture(botName: String, id: Long): CompletableFuture<Triple<String, Long, String>>? =
             courseApp.login(botName, "").recoverWith {
-                if (!(it is UserAlreadyLoggedInException)) throw it
+                if (it !is UserAlreadyLoggedInException) throw it
                 else courseBotApi.findBot(botName).thenApply { it!!.botToken }
             } .thenApply { token: String -> Triple(token, id, botName) }
 
     private fun generateBotId(): CompletableFuture<Long> {
-        return courseBotApi.findMetadata(BotsMetadata.KEY_LAST_BOT_ID, botsMetadataName)
+        return courseBotApi.findCounter(KEY_LAST_BOT_ID)
                 .thenCompose { currId ->
                     if (currId == null)
-                        courseBotApi.createMetadata(BotsMetadata.KEY_LAST_BOT_ID, botsMetadataName, 0L).thenApply { 0L }
+                        courseBotApi.createCounter(KEY_LAST_BOT_ID).thenApply { 0L }
                     else
-                        courseBotApi.updateMetadata(BotsMetadata.KEY_LAST_BOT_ID, botsMetadataName, currId+1L)
-                            .thenApply { currId+1L } }
+                        courseBotApi.updateCounter(KEY_LAST_BOT_ID, currId.value + 1L)
+                                .thenApply { currId.value + 1L }
+                }
     }
 
     // TODO: what if channel does not exists?

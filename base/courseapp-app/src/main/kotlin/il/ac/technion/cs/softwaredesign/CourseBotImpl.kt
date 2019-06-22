@@ -8,6 +8,7 @@ import il.ac.technion.cs.softwaredesign.lib.api.CourseBotApi
 import il.ac.technion.cs.softwaredesign.lib.api.model.Bot
 import il.ac.technion.cs.softwaredesign.lib.api.model.BotsMetadata
 import il.ac.technion.cs.softwaredesign.lib.api.model.Channel
+import il.ac.technion.cs.softwaredesign.lib.db.Counter
 import il.ac.technion.cs.softwaredesign.lib.db.dal.GenericKeyPair
 import il.ac.technion.cs.softwaredesign.lib.utils.mapComposeList
 import il.ac.technion.cs.softwaredesign.messages.MediaType
@@ -29,6 +30,7 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
         val channelNameRule = "#[#_A-Za-z0-9]*".toRegex()
         private const val botsMetadataName = "allBots"
         private const val botsStorageName = "botsStorage"
+        const val KEY_LAST_CHANNEL_ID = "lastChannelId"
     }
 
     private val channelTreeWrapper: TreeWrapper = TreeWrapper(courseBotApi, "channel_")
@@ -61,14 +63,14 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
     private fun getChannelId(channelName: String) = courseBotApi.findChannel(channelName).thenApply { it!!.channelId }
 
     private fun generateChannelId(): CompletableFuture<Long> {
-        val key = "$botsMetadataName,${BotsMetadata.KEY_LAST_CHANNEL_ID}"
-        return courseBotApi.findMetadata(botsStorageName, key)
+        return courseBotApi.findCounter(KEY_LAST_CHANNEL_ID)
                 .thenCompose { currId ->
                     if (currId == null)
-                        courseBotApi.createMetadata(botsStorageName, key, 0L).thenApply { 0L }
+                        courseBotApi.createCounter(KEY_LAST_CHANNEL_ID).thenApply { 0L }
                     else
-                        courseBotApi.updateMetadata(botsStorageName, key, currId+1L)
-                                .thenApply { currId+1L } }
+                        courseBotApi.updateCounter(KEY_LAST_CHANNEL_ID, currId.value + 1L)
+                                .thenApply { currId.value + 1L }
+                }
     }
 
     // insert pair of (id, name) to keep the list sorted by generation time
@@ -114,11 +116,11 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
         return botTreeWrapper.treeGet(Bot.LIST_BOT_CHANNELS, bot.name)
     }
 
-    private fun restartMetadata(label: String, key: String): CompletableFuture<Unit> {
-        return courseBotApi.findMetadata(label, key)
+    private fun restartCounter(key: String): CompletableFuture<Counter> {
+        return courseBotApi.findCounter(key)
                 .thenCompose {
-                    if (it == null) courseBotApi.createMetadata(label, key, 0L)
-                    else courseBotApi.updateMetadata(label, key, 0L)
+                    if (it == null) courseBotApi.createCounter(key).thenApply { counter -> counter!! }
+                    else courseBotApi.updateCounter(key, 0L).thenApply { counter -> counter!! }
                 }
     }
 
@@ -143,14 +145,17 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
         val key = "${bot.name},$combinedRegexMedia"
         val countCallback: ListenerCallback = { source: String, message: Message ->
             if (shouldBeCountMessage(regex, mediaType, source, message)) {
-                courseBotApi.findMetadata(botsStorageName, key)
-                        .thenCompose { counter -> courseBotApi.updateMetadata(botsStorageName, key, counter!! + 1L) }
+                courseBotApi.findCounter(key)
+                        .thenCompose { counter -> courseBotApi.updateCounter(key, counter!!.value + 1L) }
                         .thenCompose {
                             val channelName = source.channelName
                             val namedRegexMedia = createNamedRegexMedia(channelName, combinedRegexMedia)
                             val namedKey = "${bot.name},$namedRegexMedia"
-                            courseBotApi.findMetadata(botsStorageName, namedKey)
-                                    .thenCompose { channelCounter -> courseBotApi.updateMetadata(botsStorageName, namedKey, channelCounter!! + 1L) }
+                            courseBotApi.findCounter(namedKey)
+                                    .thenCompose { channelCounter ->
+                                        courseBotApi.updateCounter(namedKey, channelCounter!!.value + 1L)
+                                    }
+                                    .thenApply { }
                         }
             } else ImmediateFuture { }
         }
@@ -159,10 +164,10 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
                     it.mapComposeList { channelName ->
                         val namedRegexMedia = createNamedRegexMedia(channelName, combinedRegexMedia)
                         val namedKey = "${bot.name},$namedRegexMedia"
-                        restartMetadata(botsStorageName, namedKey)
+                        restartCounter(namedKey)
                     }
                 }
-                .thenCompose { restartMetadata(botsStorageName, key) }
+                .thenCompose { restartCounter(key) }
                 .thenCompose { courseApp.addListener(bot.token, countCallback) } //TODO: add listener to storage
     }
 

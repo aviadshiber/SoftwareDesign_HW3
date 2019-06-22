@@ -3,6 +3,7 @@ package il.ac.technion.cs.softwaredesign.lib.db
 class Counter : BaseModel() {
 
     companion object {
+        const val TYPE = "counter"
         const val KEY_VALUE = "value"
     }
 
