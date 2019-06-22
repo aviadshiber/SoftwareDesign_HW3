@@ -13,7 +13,6 @@ class Bot : BaseModel() {
         const val KEY_BOT_CALCULATION_TRIGGER = "calculationTrigger"
 
         const val LIST_BOT_CHANNELS = "botChannels"
-        const val LIST_MSG_COUNTERS_SETTINGS = "msgCountersSettings"
     }
 
     var botId: Long = -1L

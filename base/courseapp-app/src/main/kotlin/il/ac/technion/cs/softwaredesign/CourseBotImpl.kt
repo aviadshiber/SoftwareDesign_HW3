@@ -127,14 +127,17 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
         return Pair(mediaType?.ordinal?.toLong(), regex).pairToString()
     }
 
-    private fun extractChannelNameFromSource(source: String): String = source.split('@')[0]
+    private fun addBotPrefixToLabel(botName: String, label: String) = "$botName,$label"
+
+    private fun createNamedLabelFromLabel(name: String, label: String) = "$name,$label"
+    private fun extractLabelFromNamedLabel(namedLabel: String) = namedLabel.split(',')[0]
+    private fun extractNameFromNamedLabel(namedLabel: String) = namedLabel.split(',', limit = 1)[1]
 
     // manage list of pairs (mediaType, regex)
     // in begin - add the pair to the list, and add metadata with counter = 0
     // in update - find the pair in the list, if exist - get&update metadata to counter++
     // in init statistics - iterate over the list, get&update metadata to counter = 0, clear list
     override fun beginCount(regex: String?, mediaType: MediaType?): CompletableFuture<Unit> {
-        //todo: iterator over all channels and setCounter to zero
         if (regex == null && mediaType == null) ImmediateFuture { throw IllegalArgumentException() } //TODO: ask matan if throw without future
         val label = getLabelFromRegexMediaType(regex, mediaType)
         val countCallback: ListenerCallback = { source: String, message: Message ->
@@ -142,31 +145,32 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
                 courseBotApi.findMetadata(label, bot.botName)
                         .thenCompose { counter -> courseBotApi.updateMetadata(label, bot.botName, counter!! + 1L) }
                         .thenCompose {
-                            val channelName = extractChannelNameFromSource(source)
-                            courseBotApi.findMetadata(label, channelName)
-                                    .thenCompose { channelCounter -> courseBotApi.updateMetadata(label, channelName, channelCounter!! + 1L) }
+                            val channelName = source.channelName
+                            val namedLabel = createNamedLabelFromLabel(channelName, label)
+                            courseBotApi.findMetadata(namedLabel, bot.botName)
+                                    .thenCompose { channelCounter -> courseBotApi.updateMetadata(namedLabel, bot.botName, channelCounter!! + 1L) }
                         }
             } else ImmediateFuture { }
         }
         return courseBotApi.listGet(Bot.LIST_BOT_CHANNELS, bot.botName)
                 .thenCompose {
                     it.mapComposeList<String, Unit>{ channelName ->
-                        addToListIfNotExist(Channel.LIST_CHANNEL_MSG_COUNTERS_SETTINGS, channelName, label)
-                                .thenCompose { restartMetadata(label, channelName) }
+                        val namedLabel =  createNamedLabelFromLabel(channelName, label)
+                        restartMetadata(namedLabel, bot.botName)
                     }
                 }
-                .thenCompose { addToListIfNotExist(Bot.LIST_MSG_COUNTERS_SETTINGS, bot.botName, label) }
                 .thenCompose { restartMetadata(label, bot.botName) }
                 .thenCompose { courseApp.addListener(bot.botToken, countCallback) } //TODO: add listener to storage
     }
 
     override fun count(channel: String?, regex: String?, mediaType: MediaType?): CompletableFuture<Long> {
-        if (channel == null) {
-            // get sum of counters of all bot's channel
+        val label = getLabelFromRegexMediaType(regex, mediaType)
+        return if (channel == null) {
+            courseBotApi.findMetadata(label, bot.botName).thenApply { it ?: throw IllegalArgumentException() }
         } else {
-            // get counter of current channel
+            val namedLabel = createNamedLabelFromLabel(channel, label)
+            courseBotApi.findMetadata(namedLabel, bot.botName).thenApply { it ?: throw IllegalArgumentException() }
         }
-        return getCounter(channel, regex, mediaType).thenApply { it ?: throw IllegalArgumentException() }
     }
 
     override fun setCalculationTrigger(trigger: String?): CompletableFuture<String?> {
