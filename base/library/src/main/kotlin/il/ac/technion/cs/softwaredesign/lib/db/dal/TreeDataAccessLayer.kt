@@ -22,7 +22,7 @@ data class KeyPair<K : Comparable<K>>(private var first: K, private val second: 
     }
 }
 
-class TreeDataAccessLayer<T>(type: String = "", storage: CompletableFuture<SecureStorage>): DataAccessLayer<KeyPair<Long>, T> {
+class TreeDataAccessLayer<T>(storage: CompletableFuture<SecureStorage>, type: String = ""): DataAccessLayer<KeyPair<Long>, T> {
     private val tree = BalancedStorageTree<KeyPair<Long>, T>(storage, type = type)
 
     override fun readObject(id: KeyPair<Long>, keys: List<String>): CompletableFuture<T?> {
