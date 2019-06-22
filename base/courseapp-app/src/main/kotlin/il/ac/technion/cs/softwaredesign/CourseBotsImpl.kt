@@ -95,14 +95,12 @@ class CourseBotsImpl @Inject constructor(botsSecureStorage: SecureStorage,
     override fun bots(channel: String?): CompletableFuture<List<String>> {
             return if (channel == null)
                 courseBotApi.listGet(BotsMetadata.ALL_BOTS, botsMetadataName)
-                        .thenApply { lst -> lst?.map{it.stringToPair().second!!} ?: emptyList<String>() }
+                        .thenApply { lst -> lst?.map { it.stringToPair().second!! } ?: emptyList() }
             else
-                courseBotApi.findChannel(channel)
-                .thenCompose { channelObj ->
-                    courseBotApi.listGet(Channel.LIST_BOTS, channel)
+                courseBotApi.listGet(Channel.LIST_BOTS, channel)
                             .thenApply { lst ->
-                                lst?.map{it.stringToPair().second!!} ?: emptyList<String>()
+                                lst?.map { it.stringToPair().second!! } ?: emptyList()
                             }
-                }
+
     }
 }
