@@ -129,7 +129,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
 
     private fun extractChannelNameFromSource(source: String): String = source.split('@')[0]
 
-    // manage list of pairs (regex, mediaType)
+    // manage list of pairs (mediaType, regex)
     // in begin - add the pair to the list, and add metadata with counter = 0
     // in update - find the pair in the list, if exist - get&update metadata to counter++
     // in init statistics - iterate over the list, get&update metadata to counter = 0, clear list
@@ -151,7 +151,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
         return courseBotApi.listGet(Bot.LIST_BOT_CHANNELS, bot.botName)
                 .thenCompose {
                     it.mapComposeList<String, Unit>{ channelName ->
-                        addToListIfNotExist(Channel.LIST_CHANNEL_MSG_COUNTERS, channelName, label)
+                        addToListIfNotExist(Channel.LIST_CHANNEL_MSG_COUNTERS_SETTINGS, channelName, label)
                                 .thenCompose { restartMetadata(label, channelName) }
                     }
                 }
@@ -159,7 +159,6 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
                 .thenCompose { restartMetadata(label, bot.botName) }
                 .thenCompose { courseApp.addListener(bot.botToken, countCallback) } //TODO: add listener to storage
     }
-
 
     override fun count(channel: String?, regex: String?, mediaType: MediaType?): CompletableFuture<Long> {
         if (channel == null) {

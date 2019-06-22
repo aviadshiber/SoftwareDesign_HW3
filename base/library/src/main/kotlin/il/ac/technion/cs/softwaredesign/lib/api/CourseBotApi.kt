@@ -124,8 +124,8 @@ class CourseBotApi @javax.inject.Inject constructor(private val db: Database) {
         return db.document(Channel.TYPE)
                 .delete(name, listOf())
                 .executeFor(Channel::class.java)
-                .thenCompose { channel -> deleteMetadata(CHANNELS_BY_USERS,name).thenApply { channel } }
-                .thenCompose { channel -> deleteMetadata(CHANNELS_BY_ONLINE_USERS, name).thenApply { channel }}
+                //.thenCompose { channel -> deleteMetadata(CHANNELS_BY_USERS,name).thenApply { channel } }
+                //.thenCompose { channel -> deleteMetadata(CHANNELS_BY_ONLINE_USERS, name).thenApply { channel }}
     }
 
     /**

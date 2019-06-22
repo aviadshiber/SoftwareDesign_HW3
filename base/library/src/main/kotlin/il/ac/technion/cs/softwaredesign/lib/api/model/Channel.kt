@@ -27,7 +27,10 @@ class Channel: BaseModel() {
          */
         const val LIST_BOTS = "channelBots"
 
-        const val LIST_CHANNEL_MSG_COUNTERS = "channelMsgCounters"
+        /**
+         * list of valid pairs of (mediaType, regex)
+         */
+        const val LIST_CHANNEL_MSG_COUNTERS_SETTINGS = "channelMsgCountersSettings"
     }
 
     lateinit var name: String

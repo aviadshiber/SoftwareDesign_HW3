@@ -8,6 +8,7 @@ import il.ac.technion.cs.softwaredesign.lib.api.model.Channel
 import il.ac.technion.cs.softwaredesign.messages.MessageFactory
 import il.ac.technion.cs.softwaredesign.storage.SecureStorage
 import io.github.vjames19.futures.jdk8.recover
+import io.github.vjames19.futures.jdk8.recoverWith
 import java.time.LocalDateTime
 import java.util.concurrent.CompletableFuture
 import javax.inject.Inject
@@ -32,7 +33,7 @@ class CourseBotsImpl @Inject constructor(botsSecureStorage: SecureStorage,
 
     override fun bot(name: String?): CompletableFuture<CourseBot> {
         return generateBotId().thenApply { chooseBotName(name, it) }
-                .thenCompose { (id, botName) -> loginBotFuture(botName, id) }
+                .thenCompose { (id, botName) -> loginBotIfNotExistFuture(botName, id) }
                 .thenCompose { (token, id, botName) -> courseBotApi.createBot(botName, token, id) }
                 // TODO: we need sorted tree according id... check if this key is valid for this purpose (we need string as list values)
                 .thenCompose { bot -> courseBotApi.listInsert(BotsMetadata.ALL_BOTS, botsMetadataName, Pair(bot!!.botId, bot.botName).pairToString()).thenApply { bot } }
@@ -75,8 +76,11 @@ class CourseBotsImpl @Inject constructor(botsSecureStorage: SecureStorage,
 //                        else throw it
 //                    }.thenApply { token -> Triple(token, id, botName) }
 
-    private fun loginBotFuture(botName: String, id: Long): CompletableFuture<Triple<String, Long, String>>? =
-            courseApp.login(botName, "").thenApply { token: String -> Triple(token, id, botName) }
+    private fun loginBotIfNotExistFuture(botName: String, id: Long): CompletableFuture<Triple<String, Long, String>>? =
+            courseApp.login(botName, "").recoverWith {
+                if (!(it is UserAlreadyLoggedInException)) throw it
+                else courseBotApi.findBot(botName).thenApply { it!!.botToken }
+            } .thenApply { token: String -> Triple(token, id, botName) }
 
     private fun generateBotId(): CompletableFuture<Long> {
         return courseBotApi.findMetadata(BotsMetadata.KEY_LAST_BOT_ID, botsMetadataName)
