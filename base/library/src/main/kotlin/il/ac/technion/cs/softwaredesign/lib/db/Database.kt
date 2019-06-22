@@ -1,12 +1,16 @@
 package il.ac.technion.cs.softwaredesign.lib.db
 
 import il.ac.technion.cs.softwaredesign.lib.db.dal.DocumentDataAccessLayer
+import il.ac.technion.cs.softwaredesign.lib.db.dal.GenericKeyPair
 import il.ac.technion.cs.softwaredesign.lib.db.dal.KeyPair
 import il.ac.technion.cs.softwaredesign.lib.db.dal.TreeDataAccessLayer
+import il.ac.technion.cs.softwaredesign.lib.utils.BalancedStorageTree
 import il.ac.technion.cs.softwaredesign.lib.utils.StorageList
 import il.ac.technion.cs.softwaredesign.storage.SecureStorageFactory
 import java.util.concurrent.CompletableFuture
 import javax.inject.Inject
+
+typealias BalancedLongStringTree = BalancedStorageTree<GenericKeyPair<Long, String>, String>
 
 class Database @Inject constructor(private val factory: SecureStorageFactory) {
 
@@ -14,12 +18,15 @@ class Database @Inject constructor(private val factory: SecureStorageFactory) {
         const val KEY_METADATA_COUNTER = "counterDAL"
         const val DEFAULT_DATABASE = "__default"
         const val LIST_DATABASE = "__lists"
+        const val TREE_DATABASE = "__trees"
         const val COUNTER_DATABASE = "__counter"
     }
 
     private val treeDALS: MutableMap<String, TreeDataAccessLayer<String>> = HashMap()
     private val listDALS: MutableMap<String, StorageList> = HashMap()
+    private val treeMap: MutableMap<String, BalancedLongStringTree> = HashMap()
     private val listStorage = factory.open(LIST_DATABASE.toByteArray())
+    private val treeStorage = factory.open(TREE_DATABASE.toByteArray())
     private val documentDAL: DocumentDataAccessLayer = DocumentDataAccessLayer(factory.open(DEFAULT_DATABASE.toByteArray()))
 
 
@@ -49,6 +56,13 @@ class Database @Inject constructor(private val factory: SecureStorageFactory) {
         val dal = treeDALS[query] ?: TreeDataAccessLayer(factory.open(query.toByteArray()))
         treeDALS[query] = dal
         return MetadataQueryBuilder(query, dal)
+    }
+
+    fun tree(type: String = "", name: String): BalancedLongStringTree {
+        val key = type + "_" + name
+        val bTree = treeMap[key] ?: BalancedStorageTree(treeStorage, type = key)
+        treeMap[key] = bTree
+        return bTree
     }
 
     /**

@@ -7,16 +7,29 @@ import java.io.Serializable
 import java.util.concurrent.CompletableFuture
 
 data class KeyPair<K : Comparable<K>>(private var first: K, private val second: K) : Comparable<KeyPair<K>>, Serializable{
-
     fun setFirst(value: K) {
         this.first = value
     }
-
     fun getFirst() = first
 
     fun getSecond() = second
 
     override fun compareTo(other: KeyPair<K>): Int {
+        val firstCompare :Int = this.first.compareTo(other.first)
+        return if (firstCompare != 0) firstCompare.times(-1) else this.second.compareTo(other.second)
+    }
+}
+
+data class GenericKeyPair<PrimeKey : Comparable<PrimeKey>, SecKey : Comparable<SecKey>>(
+        private var first: PrimeKey, private val second: SecKey) : Comparable<GenericKeyPair<PrimeKey, SecKey>>, Serializable{
+    fun setFirst(value: PrimeKey) {
+        this.first = value
+    }
+    fun getFirst() = first
+
+    fun getSecond() = second
+
+    override fun compareTo(other: GenericKeyPair<PrimeKey, SecKey>): Int {
         val firstCompare :Int = this.first.compareTo(other.first)
         return if (firstCompare != 0) firstCompare.times(-1) else this.second.compareTo(other.second)
     }
@@ -42,7 +55,7 @@ class TreeDataAccessLayer<T>(storage: CompletableFuture<SecureStorage>, type: St
     }
 
     fun getMax(): CompletableFuture<Pair<KeyPair<Long>, T>?> {
-        return tree.rightmost()
+        return tree.leftmost()
     }
 
     fun isMaxUnique(): CompletableFuture<Boolean> {

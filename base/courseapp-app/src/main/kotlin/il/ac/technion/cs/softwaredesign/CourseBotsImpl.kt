@@ -16,10 +16,16 @@ typealias  BotId = Long
 
 class CourseBotsImpl @Inject constructor(botsSecureStorage: SecureStorage,
                                          private val courseApp: CourseApp,
-                                         //, private val database: DataBase<String, Long>
                                          private val courseBotApi: CourseBotApi, // TODO: should be a singleton
                                          private val messageFactory: MessageFactory
 ) : CourseBots {
+    override fun prepare(): CompletableFuture<Unit> {
+        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+    }
+
+    override fun start(): CompletableFuture<Unit> {
+        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+    }
 
     init {
     }

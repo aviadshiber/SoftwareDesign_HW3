@@ -319,12 +319,6 @@ open class StorageTree<K: Comparable<K>, V>(private val storage: CompletableFutu
             }
         }
 
-        fun rightmost(): CompletableFuture<StorageNode<K, V>?> {
-            return right().thenCompose { right ->
-                right?.rightmost() ?: CompletableFuture.completedFuture(this)
-            }
-        }
-
         fun search(key: K): CompletableFuture<StorageNode<K, V>?> {
             if (this.key == key) return CompletableFuture.completedFuture(this)
 
@@ -575,6 +569,11 @@ open class StorageTree<K: Comparable<K>, V>(private val storage: CompletableFutu
         }.thenApply { node -> node?.value }
     }
 
+    fun leftmost(): CompletableFuture<Pair<K, V>?> {
+        return root.thenCompose { r -> r?.leftmost() }
+                .thenApply { node: StorageNode<K,V>? -> if(node==null) null else Pair(node.key, node.value) }
+    }
+
     /**
      * Delete an element from the tree
      * @param delKey The key to look up and delete the element associated with it
@@ -590,12 +589,6 @@ open class StorageTree<K: Comparable<K>, V>(private val storage: CompletableFutu
      */
     fun inorder(operator: (Pair<K, V>) -> Unit): CompletableFuture<Unit> {
         return root.thenCompose { r -> r?.inorder(operator) ?: CompletableFuture.completedFuture(Unit) }
-    }
-
-    fun rightmost(): CompletableFuture<Pair<K, V>?> {
-        return root.thenCompose { r ->
-            r?.rightmost() ?: CompletableFuture.completedFuture(null as StorageNode<K, V>?)
-        }.thenApply { node -> if(node==null) null else Pair(node.key, node.value) }
     }
 
     /**
