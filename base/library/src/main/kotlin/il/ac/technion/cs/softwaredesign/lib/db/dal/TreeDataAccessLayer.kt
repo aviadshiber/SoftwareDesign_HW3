@@ -2,6 +2,7 @@ package il.ac.technion.cs.softwaredesign.lib.db.dal
 
 import il.ac.technion.cs.softwaredesign.lib.utils.BalancedStorageTree
 import il.ac.technion.cs.softwaredesign.storage.SecureStorage
+import io.github.vjames19.futures.jdk8.ImmediateFuture
 import java.io.Serializable
 import java.util.concurrent.CompletableFuture
 
@@ -38,5 +39,32 @@ class TreeDataAccessLayer<T>(storage: CompletableFuture<SecureStorage>): DataAcc
 
     fun getSequence(n: Int): CompletableFuture<Sequence<Pair<KeyPair<Long>, T>>> {
         return tree.asList(n).thenApply { it.asSequence() }
+    }
+
+    fun getMax(): CompletableFuture<Pair<KeyPair<Long>, T>?> {
+        return tree.rightmost()
+    }
+
+    fun isMaxUnique(): CompletableFuture<Boolean> {
+        return getMax().thenCompose { keyPairValue ->
+            if (keyPairValue == null) ImmediateFuture { false }
+            else {
+                val keyPair = keyPairValue.first
+                val firstKeyToCompare = keyPair.getFirst()
+                deleteObject(keyPair, emptyList())
+                        .thenCompose { getMax() }
+                        .thenApply { secKeyPairValue ->
+                            if (secKeyPairValue == null) true
+                            else {
+                                val secKeyPair = secKeyPairValue.first
+                                val secKeyToCompare = secKeyPair.getFirst()
+                                firstKeyToCompare != secKeyToCompare
+                            }
+                        }
+                        .thenCompose { res ->
+                            writeObject(keyPairValue.first, keyPairValue.second).thenApply { res }
+                        }
+            }
+        }
     }
 }

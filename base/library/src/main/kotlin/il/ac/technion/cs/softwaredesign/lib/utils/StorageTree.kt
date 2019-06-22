@@ -14,10 +14,14 @@ class DefaultComparator<K: Comparable<K>> : Comparator<K> {
     override fun compare(o1: K, o2: K): Int = o1.compareTo(o2)
 }
 
-class BalancedStorageTree<K: Comparable<K>, V>(storage: CompletableFuture<SecureStorage>, comparator: Comparator<K> = DefaultComparator(), type: String = "") :
-        StorageTree<K, V>(storage, comparator, true, type)
+class BalancedStorageTree<K: Comparable<K>, V>(storage: CompletableFuture<SecureStorage>,
+                                               comparator: Comparator<K> = DefaultComparator(),
+                                               type: String = "") : StorageTree<K, V>(storage, comparator, true, type)
 
-open class StorageTree<K: Comparable<K>, V>(private val storage: CompletableFuture<SecureStorage>, private val comparator: Comparator<K>, private val isBalancing: Boolean, private val type: String = "") {
+open class StorageTree<K: Comparable<K>, V>(private val storage: CompletableFuture<SecureStorage>,
+                                            private val comparator: Comparator<K>,
+                                            private val isBalancing: Boolean,
+                                            private val type: String = "") {
 
     companion object {
         const val KEY_ROOT_NODE = "root node"
@@ -315,6 +319,12 @@ open class StorageTree<K: Comparable<K>, V>(private val storage: CompletableFutu
             }
         }
 
+        fun rightmost(): CompletableFuture<StorageNode<K, V>?> {
+            return right().thenCompose { right ->
+                right?.rightmost() ?: CompletableFuture.completedFuture(this)
+            }
+        }
+
         fun search(key: K): CompletableFuture<StorageNode<K, V>?> {
             if (this.key == key) return CompletableFuture.completedFuture(this)
 
@@ -580,6 +590,12 @@ open class StorageTree<K: Comparable<K>, V>(private val storage: CompletableFutu
      */
     fun inorder(operator: (Pair<K, V>) -> Unit): CompletableFuture<Unit> {
         return root.thenCompose { r -> r?.inorder(operator) ?: CompletableFuture.completedFuture(Unit) }
+    }
+
+    fun rightmost(): CompletableFuture<Pair<K, V>?> {
+        return root.thenCompose { r ->
+            r?.rightmost() ?: CompletableFuture.completedFuture(null as StorageNode<K, V>?)
+        }.thenApply { node -> if(node==null) null else Pair(node.key, node.value) }
     }
 
     /**
