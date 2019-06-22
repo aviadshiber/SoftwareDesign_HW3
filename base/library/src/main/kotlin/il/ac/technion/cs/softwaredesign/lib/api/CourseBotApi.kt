@@ -189,13 +189,15 @@ class CourseBotApi @javax.inject.Inject constructor(private val db: Database) {
     }
 
     /**
-     * Retrieve a value from tree
+     * Retrieve all tree's keys
      * @param type The tree type
      * @param name Ths tree name
-     * @return The desired value from tree, or null if key does not exist
+     * @return The desired tree's strings extracted from keys, or empty list if tree does not exist
      */
-    fun treeGet(type: String, name: String, keyPair: GenericKeyPair<Long, String>): CompletableFuture<String?> {
-        return db.tree(type, name).search(keyPair)
+    fun treeGet(type: String, name: String): CompletableFuture<List<String>> {
+        return db.tree(type, name).asSequence()
+                .thenApply { seq -> seq.toList() }
+                .thenApply { lst -> lst.map { it.first.getSecond() } }
     }
 
     /**

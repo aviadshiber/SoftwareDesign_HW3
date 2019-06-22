@@ -5,6 +5,7 @@ import il.ac.technion.cs.softwaredesign.lib.api.CourseBotApi
 import il.ac.technion.cs.softwaredesign.lib.api.model.Bot
 import il.ac.technion.cs.softwaredesign.lib.api.model.BotsMetadata
 import il.ac.technion.cs.softwaredesign.lib.api.model.Channel
+import il.ac.technion.cs.softwaredesign.lib.db.dal.GenericKeyPair
 import il.ac.technion.cs.softwaredesign.messages.MessageFactory
 import il.ac.technion.cs.softwaredesign.storage.SecureStorage
 import io.github.vjames19.futures.jdk8.recoverWith
@@ -14,14 +15,16 @@ import javax.inject.Inject
 
 typealias  BotId = Long
 
-class CourseBotsImpl @Inject constructor(botsSecureStorage: SecureStorage,
-                                         private val courseApp: CourseApp,
+class CourseBotsImpl @Inject constructor(private val courseApp: CourseApp,
                                          private val courseBotApi: CourseBotApi, // TODO: should be a singleton
                                          private val messageFactory: MessageFactory
 ) : CourseBots {
 
     init {
     }
+
+    private val channelTreeWrapper: TreeWrapper = TreeWrapper(courseBotApi, "channel_")
+    private val botTreeWrapper: TreeWrapper = TreeWrapper(courseBotApi, "bot_")
 
     companion object {
         private const val botDefaultName = "Anna"
@@ -40,29 +43,9 @@ class CourseBotsImpl @Inject constructor(botsSecureStorage: SecureStorage,
         return generateBotId().thenApply { chooseBotName(name, it) }
                 .thenCompose { (id, botName) -> loginBotIfNotExistFuture(botName, id) }
                 .thenCompose { (token, id, botName) -> courseBotApi.createBot(botName, token, id) }
-                // TODO: we need sorted tree according id... check if this key is valid for this purpose (we need string as list values)
-                .thenCompose { bot -> courseBotApi.listInsert(BotsMetadata.ALL_BOTS, botsMetadataName, Pair(bot!!.botId, bot.botName).pairToString()).thenApply { bot } }
+//                .thenCompose { bot -> courseBotApi.listInsert(BotsMetadata.ALL_BOTS, botsMetadataName, Pair(bot!!.botId, bot.botName).pairToString()).thenApply { bot } }
+                .thenCompose { bot -> botTreeWrapper.treeInsert(BotsMetadata.ALL_BOTS, botsMetadataName, GenericKeyPair(bot!!.botId, bot.botName)).thenApply { bot } }
                 .thenApply { bot -> CourseBotImpl(BotClient(bot!!.botId, bot.botToken, bot.botName, courseBotApi), courseApp, messageFactory, courseBotApi) }
-    }
-
-    private fun Pair<Long?, String?>.pairToString(): String {
-        return when {
-            first == null && second == null -> ","
-            first == null -> ",$second"
-            second == null -> "$first,"
-            else -> "$first,$second"
-        }
-    }
-    private fun String.stringToPair(): Pair<Long?, String?>{
-        val values = this.split(',')
-        val first = values[0]
-        val second = values[1]
-        return when {
-            first == "" && second == "" -> Pair(null, null)
-            first == "" -> Pair(null, second)
-            second == "" -> Pair(first.toLong(), null)
-            else -> Pair(first.toLong(), second)
-        }
     }
 
     private fun getBot(name: String): CompletableFuture<Bot?> {
@@ -92,13 +75,8 @@ class CourseBotsImpl @Inject constructor(botsSecureStorage: SecureStorage,
     // TODO: check what happened if list is empty (null?)
     override fun bots(channel: String?): CompletableFuture<List<String>> {
             return if (channel == null)
-                courseBotApi.listGet(BotsMetadata.ALL_BOTS, botsMetadataName)
-                        .thenApply { lst -> lst?.map { it.stringToPair().second!! } ?: emptyList() }
+                botTreeWrapper.treeGet(BotsMetadata.ALL_BOTS, botsMetadataName)
             else
-                courseBotApi.listGet(Channel.LIST_BOTS, channel)
-                            .thenApply { lst ->
-                                lst?.map { it.stringToPair().second!! } ?: emptyList()
-                            }
-
+                channelTreeWrapper.treeGet(Channel.LIST_BOTS, channel)
     }
 }
