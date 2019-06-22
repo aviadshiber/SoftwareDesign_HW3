@@ -11,6 +11,8 @@ class Bot : BaseModel() {
         const val KEY_BOT_LAST_SEEN_MSG_TIME = "lastSeenMessageTime"
         const val KEY_BOT_CALCULATION_TRIGGER = "calculationTrigger"
         const val KEY_BOT_TIP_TRIGGER = "tipTrigger"
+        const val KEY_BOT_MOST_ACTIVE_USER = "mostActiveUser"
+        const val KEY_BOT_MOST_ACTIVE_USER_COUNT = "mostActiveUserCount"
 
         const val LIST_BOT_CHANNELS = "botChannels"
     }
@@ -21,4 +23,6 @@ class Bot : BaseModel() {
     lateinit var lastSeenMessageTime: String
     lateinit var calculationTrigger: String
     lateinit var tipTrigger: String
+    lateinit var mostActiveUser: String
+    var mostActiveUserCount: Long = -1L
 }

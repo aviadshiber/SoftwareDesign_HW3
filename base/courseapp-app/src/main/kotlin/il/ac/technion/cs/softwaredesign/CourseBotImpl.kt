@@ -18,6 +18,7 @@ import io.github.vjames19.futures.jdk8.ImmediateFuture
 import io.github.vjames19.futures.jdk8.recover
 import java.time.LocalDateTime
 import java.util.concurrent.CompletableFuture
+import kotlin.math.max
 import kotlin.reflect.KMutableProperty1
 
 
@@ -33,11 +34,11 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
         private const val botsStorageName = "botsStorage"
         const val KEY_LAST_CHANNEL_ID = "lastChannelId"
         private const val msgCounterTreeType = "msgCounter"
+        private const val userMsgCounterTreeType = "userMsgCounter"
     }
 
     private val channelTreeWrapper: TreeWrapper = TreeWrapper(courseBotApi, "channel_")
     private val botTreeWrapper: TreeWrapper = TreeWrapper(courseBotApi, "bot_")
-    private val msgCounterKeysTreeWrapper: TreeWrapper = TreeWrapper(courseBotApi, "msg_")
     init {
         /*
         TODO: 1.load all listeners from storage
@@ -100,7 +101,46 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
                 .thenCompose { createChannelIfNotExist(channelName) }
                 .thenCompose { channelId -> addChannelToBot(channelName, channelId) }
                 .thenCompose { addBotToChannel(channelName) }
-                .thenCompose { courseApp.addListener(bot.token, lastSeenCallback) } //TODO: add listener to storage
+                .thenCompose { courseApp.addListener(bot.token, buildLastSeenMsgCallback(channelName)) } //TODO: add listener to storage
+                .thenCompose { courseApp.addListener(bot.token, buildMostActiveUserCallback(channelName)) } //TODO: add listener to storage
+    }
+
+    private fun buildMostActiveUserCallback(channelName: String): ListenerCallback {
+        return { source: String, message: Message ->
+            ImmediateFuture {
+                if (isChannelNameValid(source) && source.channelName == channelName) {
+                    val sender = source.sender
+                    if (sender.isEmpty()) ImmediateFuture { Unit }
+                    else {
+                        val key = combineArgsToString(bot.name, channelName, sender)
+                        courseBotApi.treeContains(userMsgCounterTreeType, bot.name, GenericKeyPair(0L, key))
+                                .thenCompose {
+                                    courseBotApi.treeInsert(userMsgCounterTreeType, bot.name, GenericKeyPair(0L, key))
+                                }
+                                .thenCompose {
+                                    incCounterValue(key)
+                                }
+                                .thenApply { userCounter ->
+                                    val currMax = bot.mostActiveUserCount ?: -1L
+                                    val maxCount = max(currMax, userCounter!!.value)
+                                    if (maxCount > currMax) {
+                                        bot.mostActiveUser = sender
+                                        bot.mostActiveUserCount = maxCount
+                                    }
+                                }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun buildLastSeenMsgCallback(channelName: String): ListenerCallback {
+        return { source: String, message: Message ->
+            ImmediateFuture {
+                if (isChannelNameValid(source) && source.channelName == channelName && isNewMessageByCreationTime(message))
+                    bot.lastSeenMessageTime = message.created
+            }
+        }
     }
 
     override fun part(channelName: String): CompletableFuture<Unit> {
@@ -114,7 +154,8 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
                 .thenCompose { removeBotFromChannel(channelName) }
                 .thenCompose { courseBotApi.treeGet(msgCounterTreeType, bot.name) }
                 .thenCompose { counters -> counters.mapComposeList { counterId -> restartCounter(counterId) } }
-                .thenCompose { courseApp.removeListener(bot.token, lastSeenCallback) } //TODO: remove listener from storage
+                .thenCompose { courseApp.removeListener(bot.token, buildLastSeenMsgCallback(channelName)) } //TODO: remove listener from storage
+                .thenCompose { courseApp.removeListener(bot.token, buildMostActiveUserCallback(channelName)) } //TODO: remove listener from storage
     }
 
     override fun channels(): CompletableFuture<List<String>> {
@@ -142,10 +183,10 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
         val globalBotCounterName = combineArgsToString(bot.name, regex, mediaType)
         val countCallback: ListenerCallback = { source: String, message: Message ->
             if (shouldBeCountMessage(regex, mediaType, source, message)) {
-                incCounterValue(globalBotCounterName)
+                incCounterValue(globalBotCounterName)!!
                         .thenCompose {
                             val channelRegexMediaCounter = combineArgsToString(bot.name, source.channelName, regex, mediaType)
-                            incCounterValue(channelRegexMediaCounter)
+                            incCounterValue(channelRegexMediaCounter)!!.thenApply {  }
                         }
             } else ImmediateFuture { }
         }
@@ -162,10 +203,9 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
                 .thenCompose { courseApp.addListener(bot.token, countCallback) } //TODO: add listener to storage
     }
 
-    private fun incCounterValue(counterId: String): CompletableFuture<Unit> {
+    private fun incCounterValue(counterId: String): CompletableFuture<Counter?>? {
         return courseBotApi.findCounter(counterId)
                 .thenCompose { counter -> courseBotApi.updateCounter(counterId, counter!!.value + 1L) }
-                .thenApply {  }
     }
 
     override fun count(channel: String?, regex: String?, mediaType: MediaType?): CompletableFuture<Long> {
@@ -180,7 +220,7 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
 
     override fun setCalculationTrigger(trigger: String?): CompletableFuture<String?> {
         val regex = "$trigger <[()\\d*+/-\\s]+>".toRegex()
-        return setCallBackTrigger(BotClient::calculationTrigger, trigger, regex) { source: String, message: Message ->
+        return setCallBackForTrigger(BotClient::calculationTrigger, trigger, regex) { source: String, message: Message ->
             val content = String(message.contents)
             val expression = regex.matchEntire(content)!!.groups[1]!!.value
             val solution = Value(expression).resolve()
@@ -189,7 +229,7 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
         }
     }
 
-    private fun setCallBackTrigger(prop: KMutableProperty1<BotClient, String?>, trigger: String?, r: Regex, action: (source: String, message: Message) -> CompletableFuture<Unit>)
+    private fun setCallBackForTrigger(prop: KMutableProperty1<BotClient, String?>, trigger: String?, r: Regex, action: (source: String, message: Message) -> CompletableFuture<Unit>)
             : CompletableFuture<String?> {
         val prev = prop.get(bot)
         prop.set(bot, trigger)
@@ -203,7 +243,7 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
 
     override fun setTipTrigger(trigger: String?): CompletableFuture<String?> {
         val regex = "$trigger <[\\d]+> <.*>".toRegex() //$trigger $number $user
-        return setCallBackTrigger(BotClient::tipTrigger, trigger, regex) { source: String, message: Message ->
+        return setCallBackForTrigger(BotClient::tipTrigger, trigger, regex) { source: String, message: Message ->
             val content = String(message.contents)
             val number = regex.matchEntire(content)!!.groups[1]!!.value
             val destUserName = regex.matchEntire(content)!!.groups[2]!!.value
@@ -223,8 +263,9 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
         return ImmediateFuture { bot.lastSeenMessageTime }
     }
 
+    // TODO: what if there are more then one user
     override fun mostActiveUser(channel: String): CompletableFuture<String?> {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+        return ImmediateFuture { bot.mostActiveUser }
     }
 
     override fun richestUser(channel: String): CompletableFuture<String?> {
@@ -248,13 +289,6 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
             return this.substringAfter("@", "")
         }
 
-    private val lastSeenCallback: ListenerCallback = { source: String, message: Message ->
-        ImmediateFuture {
-            if (isNewMessageByCreationTime(message) && isChannelNameValid(source))
-                bot.lastSeenMessageTime = message.created
-        }
-    }
-
     private fun shouldBeCountMessage(regex: String?, mediaType: MediaType?, source: String, message: Message): Boolean {
         if (!isChannelNameValid(source)) return false
         return if (regex != null && mediaType != null)
@@ -269,44 +303,4 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
 
     private fun isRegexMatchesMessageContent(regex: String?, message: Message) =
             (regex != null && Regex(regex) matches String(message.contents))
-
-
-    /**
-     * the method gets the counter from storage with the following pattern:
-     * channelName_regex_mediaType.oridinal -> counter
-     * channelName is null to count all channels (iterate over channels of bots)
-     * null is returned if no counter was initiated yet.
-     */
-    private fun getCounter(channelName: String?, regex: String?, mediaType: MediaType?): CompletableFuture<Long?> {
-        TODO("not implemented")
-    }
-
-    /**
-     * the method set the counter with of the following pattern
-     * channelName_regex_mediaType.oridinal -> x
-     */
-    private fun setCounter(channelName: String, regex: String?, mediaType: MediaType?, x: Long): CompletableFuture<Unit> {
-        TODO("not implemented")
-    }
-
-
-    private fun Pair<Long?, String?>.pairToString(): String {
-        return when {
-            first == null && second == null -> ","
-            first == null -> ",$second"
-            second == null -> "$first,"
-            else -> "$first,$second"
-        }
-    }
-    private fun String.stringToPair(): Pair<Long?, String?>{
-        val values = this.split(',')
-        val first = values[0]
-        val second = values[1]
-        return when {
-            first == "" && second == "" -> Pair(null, null)
-            first == "" -> Pair(null, second)
-            second == "" -> Pair(first.toLong(), null)
-            else -> Pair(first.toLong(), second)
-        }
-    }
 }

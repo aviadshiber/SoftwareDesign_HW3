@@ -7,6 +7,7 @@ import java.time.format.DateTimeFormatter
 
 data class BotClient constructor(val id: Long, val token: String, val name: String, private val courseBotApi: CourseBotApi) {
 
+    // TODO: check if we can use delete instead of invalid_value
     companion object {
         const val invalid_value = ""
         val formatter: DateTimeFormatter = DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm:ss:SSS")
@@ -42,6 +43,25 @@ data class BotClient constructor(val id: Long, val token: String, val name: Stri
             courseBotApi.updateBot(name, Pair(Bot.KEY_BOT_TIP_TRIGGER, valueToWrite)).thenApply { }.join()
         }
 
+    var mostActiveUser: String?
+        get() {
+            return courseBotApi.findBot(name).thenApply { it!!.mostActiveUser }
+                    .thenApply { if (it == invalid_value) null else it }.join()
+        }
+        set(value) {
+            val valueToWrite = value ?: invalid_value
+            courseBotApi.updateBot(name, Pair(Bot.KEY_BOT_MOST_ACTIVE_USER, valueToWrite)).thenApply { }.join()
+        }
+
+    var mostActiveUserCount: Long?
+        get() {
+            return courseBotApi.findBot(name).thenApply { it!!.mostActiveUserCount }
+                    .thenApply { if (it == -1L) null else it }.join()
+        }
+        set(value) {
+            val valueToWrite = value ?: -1L
+            courseBotApi.updateBot(name, Pair(Bot.KEY_BOT_MOST_ACTIVE_USER_COUNT, valueToWrite)).thenApply { }.join()
+        }
 
     //val channels = mutableListOf<String>()
 
