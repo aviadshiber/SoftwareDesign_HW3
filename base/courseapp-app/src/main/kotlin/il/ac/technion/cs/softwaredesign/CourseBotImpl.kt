@@ -26,6 +26,7 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
     internal companion object {
         val channelNameRule = "#[#_A-Za-z0-9]*".toRegex()
         private const val botsMetadataName = "allBots"
+        private const val botsStorageName = "botsStorage"
     }
 
     init {
@@ -57,12 +58,13 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
     private fun getChannelId(channelName: String) = courseBotApi.findChannel(channelName).thenApply { it!!.channelId }
 
     private fun generateChannelId(): CompletableFuture<Long> {
-        return courseBotApi.findMetadata(BotsMetadata.KEY_LAST_CHANNEL_ID, botsMetadataName)
+        val key = "$botsMetadataName,${BotsMetadata.KEY_LAST_CHANNEL_ID}"
+        return courseBotApi.findMetadata(botsStorageName, key)
                 .thenCompose { currId ->
                     if (currId == null)
-                        courseBotApi.createMetadata(BotsMetadata.KEY_LAST_CHANNEL_ID, botsMetadataName, 0L).thenApply { 0L }
+                        courseBotApi.createMetadata(botsStorageName, key, 0L).thenApply { 0L }
                     else
-                        courseBotApi.updateMetadata(BotsMetadata.KEY_LAST_CHANNEL_ID, botsMetadataName, currId+1L)
+                        courseBotApi.updateMetadata(botsStorageName, key, currId+1L)
                                 .thenApply { currId+1L } }
     }
 
@@ -123,13 +125,13 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
                 }
     }
 
-    private fun getLabelFromRegexMediaType(regex: String?, mediaType: MediaType?): String {
+    private fun combineRegexMediaType(regex: String?, mediaType: MediaType?): String {
         return Pair(mediaType?.ordinal?.toLong(), regex).pairToString()
     }
 
     private fun addBotPrefixToLabel(botName: String, label: String) = "$botName,$label"
 
-    private fun createNamedLabelFromLabel(name: String, label: String) = "$name,$label"
+    private fun createNamedRegexMedia(name: String, label: String) = "$name,$label"
     private fun extractLabelFromNamedLabel(namedLabel: String) = namedLabel.split(',')[0]
     private fun extractNameFromNamedLabel(namedLabel: String) = namedLabel.split(',', limit = 1)[1]
 
@@ -139,37 +141,42 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
     // in init statistics - iterate over the list, get&update metadata to counter = 0, clear list
     override fun beginCount(regex: String?, mediaType: MediaType?): CompletableFuture<Unit> {
         if (regex == null && mediaType == null) ImmediateFuture { throw IllegalArgumentException() } //TODO: ask matan if throw without future
-        val label = getLabelFromRegexMediaType(regex, mediaType)
+        val combinedRegexMedia = combineRegexMediaType(regex, mediaType)
+        val key = "${bot.name},$combinedRegexMedia"
         val countCallback: ListenerCallback = { source: String, message: Message ->
             if (shouldBeCountMessage(regex, mediaType, source, message)) {
-                courseBotApi.findMetadata(label, bot.name)
-                        .thenCompose { counter -> courseBotApi.updateMetadata(label, bot.name, counter!! + 1L) }
+                courseBotApi.findMetadata(botsStorageName, key)
+                        .thenCompose { counter -> courseBotApi.updateMetadata(botsStorageName, key, counter!! + 1L) }
                         .thenCompose {
                             val channelName = source.channelName
-                            val namedLabel = createNamedLabelFromLabel(channelName, label)
-                            courseBotApi.findMetadata(namedLabel, bot.name)
-                                    .thenCompose { channelCounter -> courseBotApi.updateMetadata(namedLabel, bot.name, channelCounter!! + 1L) }
+                            val namedRegexMedia = createNamedRegexMedia(channelName, combinedRegexMedia)
+                            val namedKey = "${bot.name},$namedRegexMedia"
+                            courseBotApi.findMetadata(botsStorageName, namedKey)
+                                    .thenCompose { channelCounter -> courseBotApi.updateMetadata(botsStorageName, namedKey, channelCounter!! + 1L) }
                         }
             } else ImmediateFuture { }
         }
         return courseBotApi.listGet(Bot.LIST_BOT_CHANNELS, bot.name)
                 .thenCompose {
                     it.mapComposeList { channelName ->
-                        val namedLabel =  createNamedLabelFromLabel(channelName, label)
-                        restartMetadata(namedLabel, bot.name)
+                        val namedRegexMedia = createNamedRegexMedia(channelName, combinedRegexMedia)
+                        val namedKey = "${bot.name},$namedRegexMedia"
+                        restartMetadata(botsStorageName, namedKey)
                     }
                 }
-                .thenCompose { restartMetadata(label, bot.name) }
+                .thenCompose { restartMetadata(botsStorageName, key) }
                 .thenCompose { courseApp.addListener(bot.token, countCallback) } //TODO: add listener to storage
     }
 
     override fun count(channel: String?, regex: String?, mediaType: MediaType?): CompletableFuture<Long> {
-        val label = getLabelFromRegexMediaType(regex, mediaType)
+        val combinedRegexMedia = combineRegexMediaType(regex, mediaType)
+        val key = "${bot.name},$combinedRegexMedia"
         return if (channel == null) {
-            courseBotApi.findMetadata(label, bot.name).thenApply { it ?: throw IllegalArgumentException() }
+            courseBotApi.findMetadata(botsStorageName, key).thenApply { it ?: throw IllegalArgumentException() }
         } else {
-            val namedLabel = createNamedLabelFromLabel(channel, label)
-            courseBotApi.findMetadata(namedLabel, bot.name).thenApply { it ?: throw IllegalArgumentException() }
+            val namedRegexMedia = createNamedRegexMedia(channel, combinedRegexMedia)
+            val namedKey = "${bot.name},$namedRegexMedia"
+            courseBotApi.findMetadata(botsStorageName, namedKey).thenApply { it ?: throw IllegalArgumentException() }
         }
     }
 
@@ -195,7 +202,6 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
         }
         return courseApp.addListener(bot.token, triggerCallback).thenApply { prev } //TODO: add listener to storage
     }
-
 
     override fun setTipTrigger(trigger: String?): CompletableFuture<String?> {
         TODO("not implemented")
