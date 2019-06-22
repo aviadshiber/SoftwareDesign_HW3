@@ -8,6 +8,7 @@ import il.ac.technion.cs.softwaredesign.lib.api.CourseBotApi
 import il.ac.technion.cs.softwaredesign.lib.api.model.Bot
 import il.ac.technion.cs.softwaredesign.lib.api.model.BotsMetadata
 import il.ac.technion.cs.softwaredesign.lib.api.model.Channel
+import il.ac.technion.cs.softwaredesign.lib.db.dal.GenericKeyPair
 import il.ac.technion.cs.softwaredesign.lib.utils.mapComposeList
 import il.ac.technion.cs.softwaredesign.messages.MediaType
 import il.ac.technion.cs.softwaredesign.messages.Message
@@ -30,13 +31,12 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
         private const val botsStorageName = "botsStorage"
     }
 
-
-
+    private val channelTreeWrapper: TreeWrapper = TreeWrapper(courseBotApi, "channel_")
+    private val botTreeWrapper: TreeWrapper = TreeWrapper(courseBotApi, "bot_")
     init {
         /*
         TODO: 1.load all listeners from storage
               2.use tree for channels bot is in
-
          */
     }
 
@@ -51,7 +51,7 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
                         .thenCompose { id ->
                             courseBotApi.createChannel(channelName, id).thenApply { id }
                         }.thenCompose { id ->
-                            courseBotApi.listInsert(BotsMetadata.ALL_CHANNELS, botsMetadataName, channelName).thenApply { id }
+                            channelTreeWrapper.treeInsert(BotsMetadata.ALL_CHANNELS, botsMetadataName, GenericKeyPair(0L, channelName)).thenApply { id }
                         }
                 }
                 else ImmediateFuture { it.channelId }
@@ -73,16 +73,16 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
 
     // insert pair of (id, name) to keep the list sorted by generation time
     private fun addBotToChannel(channelName: String) =
-            courseBotApi.listInsert(Channel.LIST_BOTS, channelName, Pair(bot.id, bot.name).pairToString())
+            channelTreeWrapper.treeInsert(Channel.LIST_BOTS, channelName, GenericKeyPair(bot.id, bot.name))
 
     private fun removeBotFromChannel(channelName: String) =
-            courseBotApi.listRemove(Channel.LIST_BOTS, channelName, Pair(bot.id, bot.name).pairToString())
+            channelTreeWrapper.treeRemove(Channel.LIST_BOTS, channelName, GenericKeyPair(bot.id, bot.name))
 
     private fun addChannelToBot(channelName: String, channelId: Long) =
-            courseBotApi.listInsert(Bot.LIST_BOT_CHANNELS, bot.name, Pair(channelId, channelName).pairToString())
+            botTreeWrapper.treeInsert(Bot.LIST_BOT_CHANNELS, bot.name, GenericKeyPair(channelId, channelName))
 
     private fun removeChannelFromBot(channelName: String, channelId: Long) =
-            courseBotApi.listRemove(Bot.LIST_BOT_CHANNELS, bot.name, Pair(channelId, channelName).pairToString())
+            botTreeWrapper.treeRemove(Bot.LIST_BOT_CHANNELS, bot.name, GenericKeyPair(channelId, channelName))
 
     private fun isChannelNameValid(s: String) = channelNameRule matches s.channelName
 
@@ -111,13 +111,7 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
     }
 
     override fun channels(): CompletableFuture<List<String>> {
-        return courseBotApi.listGet(Bot.LIST_BOT_CHANNELS, bot.name)
-    }
-
-    private fun addToListIfNotExist(label: String, key: String, value: String): CompletableFuture<Unit> {
-        return courseBotApi.listContains(label, key, value)
-                .thenCompose {  if (!it) courseBotApi.listInsert(label, key, value)
-                                else ImmediateFuture { Unit }}
+        return botTreeWrapper.treeGet(Bot.LIST_BOT_CHANNELS, bot.name)
     }
 
     private fun restartMetadata(label: String, key: String): CompletableFuture<Unit> {
@@ -142,6 +136,7 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
     // in begin - add the pair to the list, and add metadata with counter = 0
     // in update - find the pair in the list, if exist - get&update metadata to counter++
     // in init statistics - iterate over the list, get&update metadata to counter = 0, clear list
+    // TODO: fix
     override fun beginCount(channel: String?, regex: String?, mediaType: MediaType?): CompletableFuture<Unit> {
         if (regex == null && mediaType == null) ImmediateFuture { throw IllegalArgumentException() } //TODO: ask matan if throw without future
         val combinedRegexMedia = combineRegexMediaType(regex, mediaType)
@@ -159,7 +154,7 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
                         }
             } else ImmediateFuture { }
         }
-        return courseBotApi.listGet(Bot.LIST_BOT_CHANNELS, bot.name)
+        return botTreeWrapper.treeGet(Bot.LIST_BOT_CHANNELS, bot.name)
                 .thenCompose {
                     it.mapComposeList { channelName ->
                         val namedRegexMedia = createNamedRegexMedia(channelName, combinedRegexMedia)

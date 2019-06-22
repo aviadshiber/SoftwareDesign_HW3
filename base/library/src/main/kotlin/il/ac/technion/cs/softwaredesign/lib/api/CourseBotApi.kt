@@ -2,6 +2,7 @@ package il.ac.technion.cs.softwaredesign.lib.api
 
 import il.ac.technion.cs.softwaredesign.lib.api.model.*
 import il.ac.technion.cs.softwaredesign.lib.db.Database
+import il.ac.technion.cs.softwaredesign.lib.db.dal.GenericKeyPair
 import il.ac.technion.cs.softwaredesign.lib.utils.generateToken
 import java.util.concurrent.CompletableFuture
 
@@ -157,6 +158,46 @@ class CourseBotApi @javax.inject.Inject constructor(private val db: Database) {
     fun listGet(type: String, name: String): CompletableFuture<List<String>> {
         return db.list(type, name).asSequence()
                 .thenApply { sequence -> sequence.map { it.second }.toList() }
+    }
+
+    /**
+     * Insert a value to a list
+     * @param type The list type. Should be unique tag associated with a database object
+     * @param name Ths list name. Should be unique for each instance of a database object
+     * @return true if the element was successfully inserted, or false if and element with the given key
+     * already exists in the tree
+     */
+    fun treeInsert(type: String, name: String, keyPair: GenericKeyPair<Long, String>, value: String = ""): CompletableFuture<Boolean> {
+        return db.tree(type, name).insert(keyPair, value)
+    }
+
+    // example:
+    // db.list(Channel.LIST_USERS, name)
+    /**
+     * Remove a value from a list
+     * @param type The list type. Should be unique tag associated with a database object
+     * @param name Ths list name. Should be unique for each instance of a database object
+     * @return true if the element was successfully deleted, or false if and element with the given key
+     * does not exists in the tree
+     */
+    fun treeRemove(type: String, name: String, keyPair: GenericKeyPair<Long, String>): CompletableFuture<Boolean> {
+        return db.tree(type, name).delete(keyPair)
+    }
+
+    fun treeContains(type: String, name: String, keyPair: GenericKeyPair<Long, String>): CompletableFuture<Boolean> {
+        return db.tree(type, name).search(keyPair).thenApply { it != null }
+    }
+
+    /**
+     * Retrieve all tree's keys
+     * @param type The tree type
+     * @param name Ths tree name
+     * @return The desired tree's strings extracted from keys, or empty list if tree does not exist
+     */
+    fun treeGet(type: String, name: String): CompletableFuture<List<String>> {
+        return db.tree(type, name).asSequence()
+                .thenApply { seq -> seq.toList() }
+                .thenApply { lst -> lst.map { it.first.getSecond() } }
     }
 
     /**
