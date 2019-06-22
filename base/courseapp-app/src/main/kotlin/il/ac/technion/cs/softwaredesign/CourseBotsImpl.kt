@@ -19,13 +19,6 @@ class CourseBotsImpl @Inject constructor(botsSecureStorage: SecureStorage,
                                          private val courseBotApi: CourseBotApi, // TODO: should be a singleton
                                          private val messageFactory: MessageFactory
 ) : CourseBots {
-    override fun prepare(): CompletableFuture<Unit> {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
-    }
-
-    override fun start(): CompletableFuture<Unit> {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
-    }
 
     init {
     }
@@ -33,6 +26,14 @@ class CourseBotsImpl @Inject constructor(botsSecureStorage: SecureStorage,
     companion object {
         private const val botDefaultName = "Anna"
         private const val botsMetadataName = "allBots"
+    }
+
+    override fun prepare(): CompletableFuture<Unit> {
+        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+    }
+
+    override fun start(): CompletableFuture<Unit> {
+        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
     }
 
     override fun bot(name: String?): CompletableFuture<CourseBot> {
@@ -70,15 +71,6 @@ class CourseBotsImpl @Inject constructor(botsSecureStorage: SecureStorage,
 
     private fun chooseBotName(name: String?, it: BotId): Pair<BotId, String> =
             if (name == null) Pair(it, "$botDefaultName$it") else Pair(it, name)
-
-    // TODO: whats happened in this function?
-//    private fun loginBotFuture(botName: String, id: Long): CompletableFuture<Triple<String, Long, String>>? =
-//            courseApp.login(botName, "")
-//                    .recover {
-//                        if (it is UserAlreadyLoggedInException)
-//                            getBot(id).token
-//                        else throw it
-//                    }.thenApply { token -> Triple(token, id, botName) }
 
     private fun loginBotIfNotExistFuture(botName: String, id: Long): CompletableFuture<Triple<String, Long, String>>? =
             courseApp.login(botName, "").recoverWith {
