@@ -18,7 +18,7 @@ import java.time.LocalDateTime
 import java.util.concurrent.CompletableFuture
 import kotlin.reflect.KMutableProperty1
 
-class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, private val messageFactory: MessageFactory,
+class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp, private val messageFactory: MessageFactory,
                     private val courseBotApi: CourseBotApi
 )
     : CourseBot {
@@ -68,16 +68,16 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
 
     // insert pair of (id, name) to keep the list sorted by generation time
     private fun addBotToChannel(channelName: String) =
-            courseBotApi.listInsert(Channel.LIST_BOTS, channelName, Pair(bot.botId, bot.botName).pairToString())
+            courseBotApi.listInsert(Channel.LIST_BOTS, channelName, Pair(bot.id, bot.name).pairToString())
 
     private fun removeBotFromChannel(channelName: String) =
-            courseBotApi.listRemove(Channel.LIST_BOTS, channelName, Pair(bot.botId, bot.botName).pairToString())
+            courseBotApi.listRemove(Channel.LIST_BOTS, channelName, Pair(bot.id, bot.name).pairToString())
 
     private fun addChannelToBot(channelName: String, channelId: Long) =
-            courseBotApi.listInsert(Bot.LIST_BOT_CHANNELS, bot.botName, Pair(channelId, channelName).pairToString())
+            courseBotApi.listInsert(Bot.LIST_BOT_CHANNELS, bot.name, Pair(channelId, channelName).pairToString())
 
     private fun removeChannelFromBot(channelName: String, channelId: Long) =
-            courseBotApi.listRemove(Bot.LIST_BOT_CHANNELS, bot.botName, Pair(channelId, channelName).pairToString())
+            courseBotApi.listRemove(Bot.LIST_BOT_CHANNELS, bot.name, Pair(channelId, channelName).pairToString())
 
     private fun isChannelNameValid(s: String) = channelNameRule matches s.channelName
 
@@ -85,28 +85,28 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
             bot.lastSeenMessageTime == null || message.created > bot.lastSeenMessageTime
 
     override fun join(channelName: String): CompletableFuture<Unit> {
-        return courseApp.channelJoin(bot.botToken, channelName)
+        return courseApp.channelJoin(bot.token, channelName)
                 .recover { throw UserNotAuthorizedException() }
                 .thenCompose { createChannelIfNotExist(channelName) }
                 .thenCompose { channelId -> addChannelToBot(channelName, channelId) }
                 .thenCompose { addBotToChannel(channelName) }
-                .thenCompose { courseApp.addListener(bot.botToken, lastSeenCallback) } //TODO: add listener to storage
+                .thenCompose { courseApp.addListener(bot.token, lastSeenCallback) } //TODO: add listener to storage
     }
 
     override fun part(channelName: String): CompletableFuture<Unit> {
         //todo: clean statistics (put null in all counters ['begin count'])
         // TOOD: which statistics exactly?
-        return courseApp.channelPart(bot.botToken, channelName)
+        return courseApp.channelPart(bot.token, channelName)
                 .recover { throw NoSuchEntityException() }
                 // channel must be exist at this point
                 .thenCompose { getChannelId(channelName) }
                 .thenCompose { channelId -> removeChannelFromBot(channelName, channelId) }
                 .thenCompose { removeBotFromChannel(channelName) }
-                .thenCompose { courseApp.removeListener(bot.botToken, lastSeenCallback) } //TODO: remove listener from storage
+                .thenCompose { courseApp.removeListener(bot.token, lastSeenCallback) } //TODO: remove listener from storage
     }
 
     override fun channels(): CompletableFuture<List<String>> {
-        return courseBotApi.listGet(Bot.LIST_BOT_CHANNELS, bot.botName)
+        return courseBotApi.listGet(Bot.LIST_BOT_CHANNELS, bot.name)
     }
 
     private fun addToListIfNotExist(label: String, key: String, value: String): CompletableFuture<Unit> {
@@ -142,49 +142,49 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
         val label = getLabelFromRegexMediaType(regex, mediaType)
         val countCallback: ListenerCallback = { source: String, message: Message ->
             if (shouldBeCountMessage(regex, mediaType, source, message)) {
-                courseBotApi.findMetadata(label, bot.botName)
-                        .thenCompose { counter -> courseBotApi.updateMetadata(label, bot.botName, counter!! + 1L) }
+                courseBotApi.findMetadata(label, bot.name)
+                        .thenCompose { counter -> courseBotApi.updateMetadata(label, bot.name, counter!! + 1L) }
                         .thenCompose {
                             val channelName = source.channelName
                             val namedLabel = createNamedLabelFromLabel(channelName, label)
-                            courseBotApi.findMetadata(namedLabel, bot.botName)
-                                    .thenCompose { channelCounter -> courseBotApi.updateMetadata(namedLabel, bot.botName, channelCounter!! + 1L) }
+                            courseBotApi.findMetadata(namedLabel, bot.name)
+                                    .thenCompose { channelCounter -> courseBotApi.updateMetadata(namedLabel, bot.name, channelCounter!! + 1L) }
                         }
             } else ImmediateFuture { }
         }
-        return courseBotApi.listGet(Bot.LIST_BOT_CHANNELS, bot.botName)
+        return courseBotApi.listGet(Bot.LIST_BOT_CHANNELS, bot.name)
                 .thenCompose {
                     it.mapComposeList<String, Unit>{ channelName ->
                         val namedLabel =  createNamedLabelFromLabel(channelName, label)
-                        restartMetadata(namedLabel, bot.botName)
+                        restartMetadata(namedLabel, bot.name)
                     }
                 }
-                .thenCompose { restartMetadata(label, bot.botName) }
-                .thenCompose { courseApp.addListener(bot.botToken, countCallback) } //TODO: add listener to storage
+                .thenCompose { restartMetadata(label, bot.name) }
+                .thenCompose { courseApp.addListener(bot.token, countCallback) } //TODO: add listener to storage
     }
 
     override fun count(channel: String?, regex: String?, mediaType: MediaType?): CompletableFuture<Long> {
         val label = getLabelFromRegexMediaType(regex, mediaType)
         return if (channel == null) {
-            courseBotApi.findMetadata(label, bot.botName).thenApply { it ?: throw IllegalArgumentException() }
+            courseBotApi.findMetadata(label, bot.name).thenApply { it ?: throw IllegalArgumentException() }
         } else {
             val namedLabel = createNamedLabelFromLabel(channel, label)
-            courseBotApi.findMetadata(namedLabel, bot.botName).thenApply { it ?: throw IllegalArgumentException() }
+            courseBotApi.findMetadata(namedLabel, bot.name).thenApply { it ?: throw IllegalArgumentException() }
         }
     }
 
     override fun setCalculationTrigger(trigger: String?): CompletableFuture<String?> {
         val regex = "$trigger <[()\\d*+/-\\s]+>".toRegex()
-        return setCallBackTrigger(Bot::calculationTrigger, trigger, regex) { source: String, message: Message ->
+        return setCallBackTrigger(BotClient::calculationTrigger, trigger, regex) { source: String, message: Message ->
             val content = String(message.contents)
             val expression = regex.matchEntire(content)!!.groups[1]!!.value
             val solution = Value(expression).resolve()
             val messageFuture = messageFactory.create(MediaType.TEXT, "$solution".toByteArray())
-            messageFuture.thenCompose { courseApp.channelSend(bot.botToken, source.channelName, it) }
+            messageFuture.thenCompose { courseApp.channelSend(bot.token, source.channelName, it) }
         }
     }
 
-    private fun setCallBackTrigger(prop: KMutableProperty1<Bot, String?>, trigger: String?, r: Regex, action: (source: String, message: Message) -> CompletableFuture<Unit>)
+    private fun setCallBackTrigger(prop: KMutableProperty1<BotClient, String?>, trigger: String?, r: Regex, action: (source: String, message: Message) -> CompletableFuture<Unit>)
             : CompletableFuture<String?> {
         val prev = prop.get(bot)
         prop.set(bot, trigger)
@@ -193,7 +193,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
             if (isChannelNameValid(source) && trigger != null && r matches content) action(source, message)
             else ImmediateFuture { }
         }
-        return courseApp.addListener(bot.botToken, triggerCallback).thenApply { prev } //TODO: add listener to storage
+        return courseApp.addListener(bot.token, triggerCallback).thenApply { prev } //TODO: add listener to storage
     }
 
 

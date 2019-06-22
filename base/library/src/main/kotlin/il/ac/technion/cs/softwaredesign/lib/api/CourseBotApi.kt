@@ -1,13 +1,8 @@
 package il.ac.technion.cs.softwaredesign.lib.api
 
 import il.ac.technion.cs.softwaredesign.lib.api.model.*
-import il.ac.technion.cs.softwaredesign.lib.api.model.UsersMetadata.Companion.CHANNELS_BY_ONLINE_USERS
-import il.ac.technion.cs.softwaredesign.lib.api.model.UsersMetadata.Companion.CHANNELS_BY_USERS
-import il.ac.technion.cs.softwaredesign.lib.api.model.UsersMetadata.Companion.USERS_BY_CHANNELS
 import il.ac.technion.cs.softwaredesign.lib.db.Database
 import il.ac.technion.cs.softwaredesign.lib.utils.generateToken
-import il.ac.technion.cs.softwaredesign.lib.utils.thenForward
-import java.time.LocalDateTime
 import java.util.concurrent.CompletableFuture
 
 class CourseBotApi @javax.inject.Inject constructor(private val db: Database) {
@@ -71,16 +66,14 @@ class CourseBotApi @javax.inject.Inject constructor(private val db: Database) {
      * @param calculationTrigger String
      * @return CompletableFuture<Bot?>
      */
-    fun createBot(name: String, token: String, id: Long
-            //, lastSeenMessageTime: LocalDateTime, calculationTrigger: String TODO: check if needed
-    ): CompletableFuture<Bot?> {
+    fun createBot(name: String, token: String, id: Long): CompletableFuture<Bot?> {
         return db.document(Bot.TYPE)
                 .create(name)
                 .set(Bot.KEY_BOT_ID, id)
                 .set(Bot.KEY_BOT_NAME, name)
                 .set(Bot.KEY_BOT_TOKEN, token)
-                //.set(Bot.KEY_BOT_LAST_SEEN_MSG_TIME, lastSeenMessageTime)
-                //.set(Bot.KEY_BOT_CALCULATION_TRIGGER, calculationTrigger)
+                .set(Bot.KEY_BOT_LAST_SEEN_MSG_TIME, "")
+                .set(Bot.KEY_BOT_CALCULATION_TRIGGER, "")
                 .executeFor(Bot::class.java)
     }
 
