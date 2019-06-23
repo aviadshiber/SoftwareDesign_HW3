@@ -1,7 +1,6 @@
 package il.ac.technion.cs.softwaredesign
 
 
-import il.ac.technion.cs.softwaredesign.exceptions.InvalidTokenException
 import il.ac.technion.cs.softwaredesign.exceptions.NoSuchEntityException
 import il.ac.technion.cs.softwaredesign.exceptions.UserNotAuthorizedException
 import il.ac.technion.cs.softwaredesign.expressionsolver.Value
@@ -106,7 +105,7 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
     }
 
     private fun buildMostActiveUserCallback(channelName: String): ListenerCallback {
-        return { source: String, _: Message ->
+        return { source: String, message: Message ->
             ImmediateFuture {
                 if (isChannelNameValid(source) && source.channelName == channelName) {
                     val sender = source.sender
@@ -122,7 +121,7 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
                                 }
                                 .thenApply { userCounter ->
                                     val currMax = bot.mostActiveUserCount ?: -1L
-                                    val maxCount = max(currMax, userCounter.value)
+                                    val maxCount = max(currMax, userCounter!!.value)
                                     if (maxCount > currMax) {
                                         bot.mostActiveUser = sender
                                         bot.mostActiveUserCount = maxCount
@@ -144,40 +143,31 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
     }
 
     private fun buildBeginCountCallback(botName: String, channelName: String?, regex: String?, mediaType: MediaType?): ListenerCallback {
-        val globalBotCounterName = combineArgsToString(botName, regex, mediaType)
         return { source: String, message: Message ->
             isValidRegistration(botName, source, channelName).thenCompose {
-                if (!it || !shouldBeCountMessage(regex, mediaType, source, message)) ImmediateFuture { }
+                if (!it || !shouldBeCountMessage(regex, mediaType, source, message)) ImmediateFuture { Unit }
                 else {
-                    if (channelName == null) {
-                        incCounterValue(globalBotCounterName).thenApply { }
-                    } else {
-                        val channelRegexMediaCounter = combineArgsToString(botName, source.channelName, regex, mediaType)
-                        incCounterValue(channelRegexMediaCounter).thenApply {}
-                    }
+                    val channelRegexMediaCounter = combineArgsToString(botName, source.channelName, regex, mediaType)
+                    incCounterValue(channelRegexMediaCounter)!!.thenApply { }
                 }
             }
         }
     }
 
     private fun beginCountCountersInit(botName: String, channelName: String?, regex: String?, mediaType: MediaType?): CompletableFuture<Unit> {
-        val globalBotCounterName = combineArgsToString(botName, regex, mediaType)
-        return if (channelName == null) {
-            restartCounter(globalBotCounterName)
-                    .thenCompose { courseBotApi.treeInsert(msgCounterTreeType, botName, GenericKeyPair(0L, globalBotCounterName)) }.thenApply { }
-        } else {
-            val channelRegexMediaCounter = combineArgsToString(botName, channelName, regex, mediaType)
-            restartCounter(channelRegexMediaCounter)
-                    .thenCompose { courseBotApi.treeInsert(msgCounterTreeType, botName, GenericKeyPair(0L, channelRegexMediaCounter)) }.thenApply { }
-        }
+        val channelRegexMediaCounter = combineArgsToString(botName, channelName, regex, mediaType)
+        return restartCounter(channelRegexMediaCounter)
+                .thenCompose { courseBotApi.treeInsert(msgCounterTreeType, botName, GenericKeyPair(0L, channelRegexMediaCounter)) }.thenApply { }
     }
 
     // TODO: check if ok
     private fun isValidRegistration(botName: String, source: String, channelName: String?): CompletableFuture<Boolean> {
         val sourceChannelName = source.channelName
         if (!isChannelNameValid(sourceChannelName) || (channelName != null && sourceChannelName != channelName)) return ImmediateFuture { false }
-        return courseBotApi.findChannel(sourceChannelName).thenApply { it!!.channelId }
-                .thenCompose { channelId -> botTreeWrapper.treeContains(Bot.LIST_BOT_CHANNELS, bot.name, GenericKeyPair(channelId, sourceChannelName)) }
+        return courseBotApi.findChannel(sourceChannelName).thenCompose {
+            if (it == null) ImmediateFuture { false }
+            else botTreeWrapper.treeContains(Bot.LIST_BOT_CHANNELS, botName, GenericKeyPair(it.channelId, sourceChannelName))
+        }
     }
 
     override fun part(channelName: String): CompletableFuture<Unit> {
@@ -202,8 +192,8 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
     private fun restartCounter(key: String): CompletableFuture<Counter> {
         return courseBotApi.findCounter(key)
                 .thenCompose {
-                    if (it == null) courseBotApi.createCounter(key)
-                    else courseBotApi.updateCounter(key, 0L)
+                    if (it == null) courseBotApi.createCounter(key).thenApply { counter -> counter!! }
+                    else courseBotApi.updateCounter(key, 0L).thenApply { counter -> counter!! }
                 }
     }
 
@@ -222,11 +212,7 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
                 .thenCompose { courseApp.addListener(bot.token, countCallback) } //TODO: add listener to storage
     }
 
-    /**
-     * the method increase the counter with [counterId].
-     * the counter id must exist inorder to use this method!!
-     */
-    private fun incCounterValue(counterId: String): CompletableFuture<Counter> {
+    private fun incCounterValue(counterId: String): CompletableFuture<Counter?>? {
         return courseBotApi.findCounter(counterId)
                 .thenCompose { counter -> courseBotApi.updateCounter(counterId, counter!!.value + 1L) }
     }
@@ -254,8 +240,7 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
         }
     }
 
-    private fun setCallBackForTrigger(prop: KMutableProperty1<BotClient, String?>, trigger: String?, r: Regex,
-                                      action: (source: String, message: Message) -> CompletableFuture<Unit>)
+    private fun setCallBackForTrigger(prop: KMutableProperty1<BotClient, String?>, trigger: String?, r: Regex, action: (source: String, message: Message) -> CompletableFuture<Unit>)
             : CompletableFuture<String?> {
         val prev = prop.get(bot)
         prop.set(bot, trigger)
@@ -291,20 +276,15 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
 
     // TODO: what if there are more then one user
     override fun mostActiveUser(channel: String): CompletableFuture<String?> {
-        return validateBotInChannel(channel).thenApply { bot.mostActiveUser }
+        return ImmediateFuture { bot.mostActiveUser }
     }
 
     override fun richestUser(channel: String): CompletableFuture<String?> {
-        return validateBotInChannel(channel)
-                .thenCompose { CashBalance(channel, bot.name).getTop() }
+        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
     }
 
-
     override fun runSurvey(channel: String, question: String, answers: List<String>): CompletableFuture<String> {
-        return validateBotInChannel(channel)
-                .thenCompose {
-                    TODO()
-                }
+        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
     }
 
     override fun surveyResults(identifier: String): CompletableFuture<List<Long>> {
@@ -319,10 +299,6 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
         get() {
             return this.substringAfter("@", "")
         }
-
-    private fun validateBotInChannel(channel: String) =
-            courseApp.isUserInChannel(bot.token, channel, bot.name)
-                    .recover { if (it !is InvalidTokenException) throw NoSuchEntityException() else throw it }
 
     private fun shouldBeCountMessage(regex: String?, mediaType: MediaType?, source: String, message: Message): Boolean {
         if (!isChannelNameValid(source)) return false
