@@ -337,7 +337,7 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
                 val content = String(message.contents)
                 surveyClient.getAnswers().thenCompose { answers ->
                     answers.filter { answer -> content.contains(answer) }
-                            .mapComposeList { answer -> surveyClient.voteForAnswer(answer) }
+                            .mapComposeList { answer -> surveyClient.voteForAnswer(answer, source.sender) }
                 }
             } else ImmediateFuture { }
         }

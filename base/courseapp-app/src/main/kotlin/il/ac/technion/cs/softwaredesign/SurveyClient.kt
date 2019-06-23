@@ -8,6 +8,7 @@ import java.util.concurrent.CompletableFuture
 typealias Answer = String
 typealias Question = String
 typealias AnswerCount = Long
+typealias UserName = String
 
 class SurveyClient constructor(private val surveyId: Long, private val botApi: CourseBotApi) {
 
@@ -32,8 +33,8 @@ class SurveyClient constructor(private val surveyId: Long, private val botApi: C
         TODO()
     }
 
-    fun voteForAnswer(answer: Answer): CompletableFuture<SurveyClient> {
-        TODO()
+    fun voteForAnswer(answer: Answer, votingUser: UserName): CompletableFuture<SurveyClient> {
+        TODO("vote for user, a user can override his vote")
     }
 
     fun getVotes(): CompletableFuture<List<AnswerCount>> {
