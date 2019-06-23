@@ -324,11 +324,11 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
         return validateBotInChannel(channel)
                 .thenCompose { generateSurveyId() }.thenCompose { id -> SurveyClient(id, courseBotApi).createQuestion(question) }
                 .thenCompose { survey -> survey.putAnswers(answers).thenApply { survey } }
-                .thenCompose { survey -> courseApp.addListener(bot.token, buildSurveyCallback(channel, survey, answers)).thenApply { survey } }
+                .thenCompose { survey -> courseApp.addListener(bot.token, buildSurveyCallback(channel, survey, answers)).thenApply { survey } } //TODO: save listener in storage
                 .thenCompose { survey -> messageFactory.create(MediaType.TEXT, question.toByteArray()).thenApply { Pair(survey, it) } }
                 .thenCompose { (survey, m) -> courseApp.channelSend(bot.token, channel, m).thenApply { survey.id } }
 
-        //TODO: ADD TO TREE OF SURVEYS!
+        //TODO: ADD TO TREE OF SURVEYS! (for 'part' maybe?)
     }
 
     private fun buildSurveyCallback(channel: String, surveyClient: SurveyClient, answers: List<String>): ListenerCallback {
