@@ -653,4 +653,8 @@ open class StorageTree<K: Comparable<K>, V>(private val storage: CompletableFutu
                     futureList
                 }
     }
+
+    fun getMax(): CompletableFuture<Pair<K, V>?> {
+        return leftmost()
+    }
 }

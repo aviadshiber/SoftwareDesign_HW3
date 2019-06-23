@@ -290,6 +290,9 @@ class CourseBotApi @javax.inject.Inject constructor(private val db: Database) {
                 .thenApply { lst -> lst.map { it.first.getSecond() } }
     }
 
+    fun treeGetMax(type: String, name: String): CompletableFuture<Pair<GenericKeyPair<Long, String>, String>?> =
+            db.tree(type, name).getMax()
+
     fun treeToSequence(type: String, name: String) = db.tree(type, name).asSequence()
 
     /**
