@@ -4,7 +4,7 @@ import com.google.gson.reflect.TypeToken
 import il.ac.technion.cs.softwaredesign.lib.db.dal.GsonInstance
 import il.ac.technion.cs.softwaredesign.lib.utils.StorageTree.StorageNode.Companion.deserialize
 import il.ac.technion.cs.softwaredesign.storage.SecureStorage
-import java.io.*
+import java.io.Serializable
 import java.nio.ByteBuffer
 import java.util.*
 import java.util.concurrent.CompletableFuture
@@ -556,6 +556,11 @@ open class StorageTree<K: Comparable<K>, V>(private val storage: CompletableFutu
                 r.insert(key, value).thenApply { r.updateNode(); it }
             }
         }
+    }
+
+    fun clean() {
+        root = CompletableFuture.completedFuture(null)
+        root.join()
     }
 
     /**
