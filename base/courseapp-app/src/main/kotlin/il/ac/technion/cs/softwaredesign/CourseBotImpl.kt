@@ -226,16 +226,6 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
                 }
     }
 
-//    private fun invalidateCounter(key: String, treeType: String, name: String): CompletableFuture<Unit> {
-//        return courseBotApi.findCounter(key)
-//                .thenCompose { counter ->
-//                    if (counter == null) ImmediateFuture { }
-//                    else courseBotApi.deleteCounter(key).thenCompose {
-//                                courseBotApi.treeRemove(treeType, name, GenericKeyPair(counter.value, key)) }
-//                            .thenDispose()
-//                }
-//
-//    }
 
     private fun combineArgsToString(vararg values: Any?): String =
             values.joinToString(separator = ",") { it?.toString() ?: "" }
