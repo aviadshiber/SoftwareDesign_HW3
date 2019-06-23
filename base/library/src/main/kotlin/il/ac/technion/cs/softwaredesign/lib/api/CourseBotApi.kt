@@ -65,8 +65,6 @@ class CourseBotApi @javax.inject.Inject constructor(private val db: Database) {
      * @param id Long
      * @param name String
      * @param token String
-     * @param lastSeenMessageTime String
-     * @param calculationTrigger String
      * @return CompletableFuture<Bot?>
      */
     fun createBot(name: String, token: String, id: Long): CompletableFuture<Bot?> {
@@ -156,24 +154,24 @@ class CourseBotApi @javax.inject.Inject constructor(private val db: Database) {
                 .executeFor(Counter::class.java)
     }
 
-    fun createSurvey(id: String, question: String): CompletableFuture<Survey> {
+    fun createSurvey(id: Long, question: String): CompletableFuture<Survey> {
         return db.document(Survey.TYPE)
-                .create(id)
+                .create(id.toString())
                 .set(Survey.KEY_QUESTION, question)
                 .executeFor(Survey::class.java).thenApply { it!! }
     }
 
-    fun updateSurvey(id: String, vararg pairs: Pair<String, Any>): CompletableFuture<Survey> {
+    fun updateSurvey(id: Long, vararg pairs: Pair<String, Any>): CompletableFuture<Survey> {
         return db.document(Survey.TYPE)
-                .update(id)
+                .update(id.toString())
                 .set(*pairs)
                 .executeFor(Survey::class.java).thenApply { it!! }
     }
 
-    fun findSurvey(id: String): CompletableFuture<Survey?> {
+    fun findSurvey(id: Long): CompletableFuture<Survey?> {
         val keys = listOf(Survey.KEY_QUESTION)
         return db.document(Survey.TYPE)
-                .find(id, keys)
+                .find(id.toString(), keys)
                 .executeFor(Survey::class.java)
     }
 
@@ -258,6 +256,8 @@ class CourseBotApi @javax.inject.Inject constructor(private val db: Database) {
                 .thenApply { seq -> seq.toList() }
                 .thenApply { lst -> lst.map { it.first.getSecond() } }
     }
+
+    fun treeToSequence(type: String, name: String) = db.tree(type, name).asSequence()
 
     /**
      * returns the metadata about Users
