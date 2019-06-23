@@ -27,6 +27,14 @@ fun <T> CompletableFuture<T>.thenDispose(): CompletableFuture<Unit> {
     return thenApply { }
 }
 
+fun <T, U> List<T>.mapComposeIndexList(transform: (i: Int, T) -> CompletableFuture<U>): CompletableFuture<Unit> {
+    return if (this.isNotEmpty())
+        this.mapIndexed { i, value -> transform(i, value) }
+                .reduce { acc, completableFuture -> acc.thenCompose { completableFuture } }
+                .thenApply { Unit }
+    else ImmediateFuture { Unit }
+}
+
 fun <T, U> List<T>.mapComposeList(transform: (T) -> CompletableFuture<U>): CompletableFuture<Unit> {
     return if (this.isNotEmpty())
         this.map { value -> transform(value) }

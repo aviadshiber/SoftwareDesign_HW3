@@ -122,6 +122,33 @@ class CourseBotApi @javax.inject.Inject constructor(private val db: Database) {
                 //.thenCompose { channel -> deleteMetadata(CHANNELS_BY_ONLINE_USERS, name).thenApply { channel }}
     }
 
+    fun createVoteAnswer(id: String, answerIndex: Long): CompletableFuture<VoteAnswer> {
+        return db.document(VoteAnswer.TYPE)
+                .create(id)
+                .set(VoteAnswer.KEY_ANSWER_INDEX, answerIndex)
+                .executeFor(VoteAnswer::class.java).thenApply { it!! }
+    }
+
+    fun updateVoteAnswer(id: String, answerIndex: Long): CompletableFuture<VoteAnswer> {
+        return db.document(VoteAnswer.TYPE)
+                .update(id)
+                .set(VoteAnswer.KEY_ANSWER_INDEX, answerIndex)
+                .executeFor(VoteAnswer::class.java).thenApply { it!! }
+    }
+
+    fun findVoteAnswer(id: String): CompletableFuture<VoteAnswer?> {
+        val keys = listOf(VoteAnswer.KEY_ANSWER_INDEX)
+        return db.document(VoteAnswer.TYPE)
+                .find(id, keys)
+                .executeFor(VoteAnswer::class.java)
+    }
+
+    fun deleteVoteAnswer(id: String): CompletableFuture<VoteAnswer?> {
+        return db.document(VoteAnswer.TYPE)
+                .delete(id, listOf(VoteAnswer.KEY_ANSWER_INDEX))
+                .executeFor(VoteAnswer::class.java)
+    }
+
     fun createCounter(id: String): CompletableFuture<Counter> {
         return db.document(Counter.TYPE)
                 .create(id)
@@ -150,7 +177,7 @@ class CourseBotApi @javax.inject.Inject constructor(private val db: Database) {
 
     fun deleteCounter(id: String): CompletableFuture<Counter?> {
         return db.document(Counter.TYPE)
-                .delete(id, listOf())
+                .delete(id, listOf(Counter.KEY_VALUE))
                 .executeFor(Counter::class.java)
     }
 
