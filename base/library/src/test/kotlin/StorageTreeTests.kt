@@ -1,8 +1,8 @@
 
 import com.natpryce.hamkrest.*
 import com.natpryce.hamkrest.assertion.assertThat
-import il.ac.technion.cs.softwaredesign.lib.utils.BalancedStorageTree
 import il.ac.technion.cs.softwaredesign.lib.mock.SecureStorageFactoryFake
+import il.ac.technion.cs.softwaredesign.lib.utils.BalancedStorageTree
 import il.ac.technion.cs.softwaredesign.storage.SecureStorage
 import il.ac.technion.cs.softwaredesign.storage.SecureStorageFactory
 import org.junit.jupiter.api.BeforeEach
@@ -137,6 +137,33 @@ class StorageTreeTests {
 
         val other = BalancedStorageTree<Int, String>(storage = storageLayer)
         assertThat(other.asSequence().join().toList().joinToString(separator = "") { it.second }, equalTo("hello, world"))
+    }
+
+    @Test
+    fun `test clean of tree`() {
+        val tree = BalancedStorageTree<Int, String>(storage = storageLayer)
+
+        val ret = tree.insert(1, ", ")
+                .thenCompose { tree.insert(2, "world") }
+                .thenCompose { tree.insert(0, "hello") }
+                .join()
+
+        assertThat(ret, equalTo(true))
+        assertThat(tree.asSequence().join().toList().joinToString(separator = "") { it.second }, equalTo("hello, world"))
+
+        val other = BalancedStorageTree<Int, String>(storage = storageLayer)
+        assertThat(other.asSequence().join().toList().joinToString(separator = "") { it.second }, equalTo("hello, world"))
+        other.clean()
+        assertThat(other.asSequence().join().toList().isEmpty(), equalTo(true))
+        assertThat(tree.asSequence().join().toList().isEmpty(), equalTo(true))
+
+//        val ret2 = tree.insert(1, ", ")
+//                .thenCompose { tree.insert(2, "world") }
+//                .thenCompose { tree.insert(0, "hello") }
+//                .join()
+//        assertThat(ret2, equalTo(true))
+//        assertThat(tree.asSequence().join().toList().joinToString(separator = "") { it.second }, equalTo("hello, world"))
+
     }
 
     // TODO Add tests for search, insert, delete and edge cases

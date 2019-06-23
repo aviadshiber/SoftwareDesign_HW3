@@ -5,6 +5,7 @@ import il.ac.technion.cs.softwaredesign.lib.db.Counter
 import il.ac.technion.cs.softwaredesign.lib.db.Database
 import il.ac.technion.cs.softwaredesign.lib.db.dal.GenericKeyPair
 import il.ac.technion.cs.softwaredesign.lib.utils.generateToken
+import io.github.vjames19.futures.jdk8.ImmediateFuture
 import java.util.concurrent.CompletableFuture
 
 class CourseBotApi @javax.inject.Inject constructor(private val db: Database) {
@@ -236,6 +237,10 @@ class CourseBotApi @javax.inject.Inject constructor(private val db: Database) {
      */
     fun treeRemove(type: String, name: String, keyPair: GenericKeyPair<Long, String>): CompletableFuture<Boolean> {
         return db.tree(type, name).delete(keyPair)
+    }
+
+    fun treeClean(type: String, name: String): CompletableFuture<Unit> {
+        return ImmediateFuture { db.tree(type, name).clean() }
     }
 
     fun treeContains(type: String, name: String, keyPair: GenericKeyPair<Long, String>): CompletableFuture<Boolean> {

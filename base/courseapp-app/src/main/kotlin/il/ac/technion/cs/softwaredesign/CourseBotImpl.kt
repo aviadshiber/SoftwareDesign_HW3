@@ -192,7 +192,7 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
                 .thenCompose { channelId -> removeChannelFromBot(channelName, channelId) }
                 .thenCompose { removeBotFromChannel(channelName) }
                 .thenCompose { courseBotApi.treeGet(msgCounterTreeType, bot.name) }
-                .thenCompose { counters -> counters.mapComposeList { counterId -> restartCounter(counterId) } }
+                .thenCompose { counters -> counters.mapComposeList { counterId -> invalidateCounter(counterId) } }
                 .thenCompose { courseApp.removeListener(bot.token, buildLastSeenMsgCallback(channelName)) } //TODO: remove listener from storage
                 .thenCompose { courseApp.removeListener(bot.token, buildMostActiveUserCallback(channelName)) } //TODO: remove listener from storage
     }
@@ -206,6 +206,14 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
                 .thenCompose {
                     if (it == null) courseBotApi.createCounter(key)
                     else courseBotApi.updateCounter(key, 0L)
+                }
+    }
+
+    private fun invalidateCounter(key: String): CompletableFuture<Unit> {
+        return courseBotApi.findCounter(key)
+                .thenCompose {
+                    if (it == null) ImmediateFuture { }
+                    else courseBotApi.deleteCounter(key).thenApply { }
                 }
     }
 
@@ -234,15 +242,11 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
     }
 
     override fun count(channel: String?, regex: String?, mediaType: MediaType?): CompletableFuture<Long> {
-        return if (channel == null) {
-            val globalBotCounterName = combineArgsToString(bot.name, regex, mediaType)
-            courseBotApi.findCounter(globalBotCounterName).thenApply { it?.value ?: throw IllegalArgumentException() }
-        } else {
-            val channelRegexMediaCounter = combineArgsToString(bot.name, channel, regex, mediaType)
-            courseBotApi.findCounter(channelRegexMediaCounter).thenApply {
+        val channelRegexMediaCounter = combineArgsToString(bot.name, channel, regex, mediaType)
+        return courseBotApi.findCounter(channelRegexMediaCounter).thenApply {
                 it?.value ?: throw IllegalArgumentException()
             }
-        }
+
     }
 
     override fun setCalculationTrigger(trigger: String?): CompletableFuture<String?> {
