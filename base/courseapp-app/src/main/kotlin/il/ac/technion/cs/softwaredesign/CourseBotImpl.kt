@@ -195,6 +195,7 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
                 .thenCompose { counters -> counters.mapComposeList { counterId -> invalidateCounter(counterId) } }
                 .thenCompose { courseApp.removeListener(bot.token, buildLastSeenMsgCallback(channelName)) } //TODO: remove listener from storage
                 .thenCompose { courseApp.removeListener(bot.token, buildMostActiveUserCallback(channelName)) } //TODO: remove listener from storage
+                .thenCompose { courseBotApi.treeClean(userMsgCounterTreeType, bot.name) }
     }
 
     override fun channels(): CompletableFuture<List<String>> {

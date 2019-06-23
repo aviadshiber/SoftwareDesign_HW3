@@ -138,10 +138,9 @@ class StorageTreeTests {
         val other = BalancedStorageTree<Int, String>(storage = storageLayer)
         assertThat(other.asSequence().join().toList().joinToString(separator = "") { it.second }, equalTo("hello, world"))
     }
-
     @Test
     fun `test clean of tree`() {
-        val tree = BalancedStorageTree<Int, String>(storage = storageLayer)
+        val tree = BalancedStorageTree<Int, String>(storage = storageLayer, type = "mytree")
 
         val ret = tree.insert(1, ", ")
                 .thenCompose { tree.insert(2, "world") }
@@ -151,18 +150,21 @@ class StorageTreeTests {
         assertThat(ret, equalTo(true))
         assertThat(tree.asSequence().join().toList().joinToString(separator = "") { it.second }, equalTo("hello, world"))
 
-        val other = BalancedStorageTree<Int, String>(storage = storageLayer)
+        val other = BalancedStorageTree<Int, String>(storage = storageLayer, type = "mytree")
         assertThat(other.asSequence().join().toList().joinToString(separator = "") { it.second }, equalTo("hello, world"))
-        other.clean()
-        assertThat(other.asSequence().join().toList().isEmpty(), equalTo(true))
+        tree.clean()
         assertThat(tree.asSequence().join().toList().isEmpty(), equalTo(true))
+        assertThat(BalancedStorageTree<Int, String>(storage = storageLayer, type = "mytree")
+                .asSequence().join().toList().isEmpty(), equalTo(true))
+        tree.insert(1, ", ")
+                .thenCompose { tree.insert(2, "world") }
+                .thenCompose { tree.insert(0, "hello") }
+                .join()
 
-//        val ret2 = tree.insert(1, ", ")
-//                .thenCompose { tree.insert(2, "world") }
-//                .thenCompose { tree.insert(0, "hello") }
-//                .join()
-//        assertThat(ret2, equalTo(true))
-//        assertThat(tree.asSequence().join().toList().joinToString(separator = "") { it.second }, equalTo("hello, world"))
+        assertThat(tree.asSequence().join().toList().joinToString(separator = "") { it.second }, equalTo("hello, world"))
+        assertThat(BalancedStorageTree<Int, String>(storage = storageLayer, type = "mytree")
+                .asSequence().join().toList().joinToString(separator = "") { it.second }, equalTo("hello, world"))
+
 
     }
 
