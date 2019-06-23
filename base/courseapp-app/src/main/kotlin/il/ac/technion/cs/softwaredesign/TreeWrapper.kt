@@ -3,7 +3,6 @@ package il.ac.technion.cs.softwaredesign
 import il.ac.technion.cs.softwaredesign.lib.api.CourseBotApi
 import il.ac.technion.cs.softwaredesign.lib.db.dal.GenericKeyPair
 import java.util.concurrent.CompletableFuture
-import javax.inject.Singleton
 
 class TreeWrapper(private val courseBotApi: CourseBotApi, private val objectPrefix: String) {
     fun treeGet(type: String, name: String): CompletableFuture<List<String>> {
@@ -25,4 +24,7 @@ class TreeWrapper(private val courseBotApi: CourseBotApi, private val objectPref
         val newType = "$objectPrefix$type"
         return courseBotApi.treeContains(newType, name, keyPair)
     }
+
+    fun treeToSequence(type: String, name: String) =
+            courseBotApi.treeToSequence("$objectPrefix$type", name)
 }
