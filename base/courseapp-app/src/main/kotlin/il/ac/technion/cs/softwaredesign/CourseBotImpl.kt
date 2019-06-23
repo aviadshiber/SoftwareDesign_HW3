@@ -307,7 +307,7 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
             val channelName = source.channelName
             courseApp.isUserInChannel(bot.token, channelName, destUserName).thenCompose { isDestInChannel ->
                 if (isDestInChannel == true) {
-                    val cashBalance = CashBalance(channelName, bot.name)
+                    val cashBalance = CashBalance(channelName, bot.name, courseBotApi)
                     cashBalance.transfer(source.sender, destUserName, number.toLong())
                 } else {
                     ImmediateFuture { }
@@ -327,7 +327,7 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
 
     override fun richestUser(channel: String): CompletableFuture<String?> {
         return validateBotInChannel(channel)
-                .thenCompose { CashBalance(channel, bot.name).getTop() }
+                .thenCompose { CashBalance(channel, bot.name, courseBotApi).getTop() }
     }
 
     override fun runSurvey(channel: String, question: String, answers: List<String>): CompletableFuture<String> {
