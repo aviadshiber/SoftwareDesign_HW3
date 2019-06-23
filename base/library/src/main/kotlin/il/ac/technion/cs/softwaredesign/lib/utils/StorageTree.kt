@@ -76,7 +76,7 @@ open class StorageTree<K: Comparable<K>, V>(private val storage: CompletableFutu
         var storage: CompletableFuture<SecureStorage> = tree.storage
 
         companion object {
-            private const val serialVersionUID = 42L
+            private const val serialVersionUID = 43L
 
             fun <K : Comparable<K>, V> deserialize(bytes: ByteArray?, tree: StorageTree<K, V>): CompletableFuture<StorageNode<K, V>?> {
                 if (bytes == null) return CompletableFuture.completedFuture(null)
@@ -88,23 +88,24 @@ open class StorageTree<K: Comparable<K>, V>(private val storage: CompletableFutu
 //                                val res = ObjectInputStream(BufferedInputStream(ByteArrayInputStream(it))).readObject() as StorageNode<K, V>
                                 val gson = GsonInstance.instance
                                 val type = object : TypeToken<Map<String, Any>>() {}.type
-                                val map: Map<String, Any> = gson.fromJson(String(it), type)
+                                val map: Map<String, Any>? = gson.fromJson(String(it), type)
+                                if (map != null) {
+                                    val res = StorageNode(
+                                            key = map["k"] as K,
+                                            value = map["v"] as V,
+                                            parentId = map["p"] as Int?,
+                                            id = map["i"] as Int,
+                                            comparator = tree.comparator,
+                                            tree = tree
+                                    )
 
-                                val res = StorageNode(
-                                        key = map["k"] as K,
-                                        value = map["v"] as V,
-                                        parentId = map["p"] as Int?,
-                                        id = map["i"] as Int,
-                                        comparator = tree.comparator,
-                                        tree = tree
-                                )
+                                    res.leftId = map["li"] as Int?
+                                    res.rightId = map["ri"] as Int?
+                                    println("Des Object: ${res.value}")
+                                    res.storage = tree.storage
 
-                                res.leftId = map["li"] as Int?
-                                res.rightId = map["ri"] as Int?
-                                println("Des Object: ${res.value}")
-                                res.storage = tree.storage
-
-                                res
+                                    res
+                                } else null
                             } else null
                         }
             }
@@ -559,6 +560,7 @@ open class StorageTree<K: Comparable<K>, V>(private val storage: CompletableFutu
     }
 
     fun clean() {
+        this.storage.thenApply { s -> s.write((type + KEY_ROOT_NODE).toByteArray(), ByteArray(0)) }.join()
         root = CompletableFuture.completedFuture(null)
         root.join()
     }
