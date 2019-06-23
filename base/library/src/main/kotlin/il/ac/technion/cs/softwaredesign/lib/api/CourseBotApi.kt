@@ -154,24 +154,24 @@ class CourseBotApi @javax.inject.Inject constructor(private val db: Database) {
                 .executeFor(Counter::class.java)
     }
 
-    fun createSurvey(id: Long, question: String): CompletableFuture<Survey> {
+    fun createSurvey(id: String, question: String): CompletableFuture<Survey> {
         return db.document(Survey.TYPE)
-                .create(id.toString())
+                .create(id)
                 .set(Survey.KEY_QUESTION, question)
                 .executeFor(Survey::class.java).thenApply { it!! }
     }
 
-    fun updateSurvey(id: Long, vararg pairs: Pair<String, Any>): CompletableFuture<Survey> {
+    fun updateSurvey(id: String, vararg pairs: Pair<String, Any>): CompletableFuture<Survey> {
         return db.document(Survey.TYPE)
-                .update(id.toString())
+                .update(id)
                 .set(*pairs)
                 .executeFor(Survey::class.java).thenApply { it!! }
     }
 
-    fun findSurvey(id: Long): CompletableFuture<Survey?> {
+    fun findSurvey(id: String): CompletableFuture<Survey?> {
         val keys = listOf(Survey.KEY_QUESTION)
         return db.document(Survey.TYPE)
-                .find(id.toString(), keys)
+                .find(id, keys)
                 .executeFor(Survey::class.java)
     }
 
