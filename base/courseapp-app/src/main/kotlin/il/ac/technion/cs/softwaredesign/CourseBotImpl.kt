@@ -146,6 +146,7 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
         }
     }
 
+    //botNme_channel
     private fun buildLastSeenMsgCallback(channelName: String): ListenerCallback {
         return { source: String, message: Message ->
             ImmediateFuture {
@@ -199,20 +200,27 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
     private fun cleanAllBotStatisticsOnChannel(channelName: String?): CompletableFuture<Unit> {
         return invalidateCounter(channelName, msgCounterTreeType, bot.name)
                 .thenCompose { invalidateCounter(channelName, userMsgCounterTreeType, bot.name) }
-
-
     }
 
     private fun invalidateCounter(channelName: String?, treeType: String, name: String): CompletableFuture<Unit> {
         return courseBotApi.treeToSequence(treeType, name).thenApply { seq ->
-            seq.filter { (genericKey, _) ->
-                channelName == null || extractChannelFromCombinedString(genericKey.getSecond()) == channelName
-            }.map { (genericKey, _) ->
+            seq.filter { (genericKey, _) -> botAndChannelMatchKeyPair(genericKey, channelName) }
+                    .map { (genericKey, _) ->
                 courseBotApi.deleteCounter(genericKey.getSecond()).thenCompose {
                     courseBotApi.treeRemove(treeType, name, genericKey)
                 }
             }
         }.thenDispose()
+    }
+
+    private fun botAndChannelMatchKeyPair(genericKey: GenericKeyPair<Long, String>, channelName: String?): Boolean {
+        val channel = channelName ?: ""
+        val extractedChannelName = extractChannelFromCombinedString(genericKey.getSecond())
+        return extractBotNameFromCombinedString(genericKey.getSecond()) == bot.name && channel == extractedChannelName
+    }
+
+    private fun extractBotNameFromCombinedString(genKey: String): String {
+        return genKey.substringBefore(",", missingDelimiterValue = "shouldNeverGetHere")
     }
 
     override fun channels(): CompletableFuture<List<String>> {
@@ -232,7 +240,7 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
             values.joinToString(separator = ",") { it?.toString() ?: "" }
 
     private fun extractChannelFromCombinedString(s: String): String =
-            s.substringAfter(",").substringBefore(",")
+            s.substringAfter(",", missingDelimiterValue = "").substringBefore(",", missingDelimiterValue = "")
 
     // manage list of pairs (mediaType, regex)
     // in begin - add the pair to the list, and add metadata with counter = 0
@@ -331,16 +339,21 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
         //TODO: ADD TO TREE OF SURVEYS! (for 'part' maybe?)
     }
 
+    // botname_channel_surveyId
     private fun buildSurveyCallback(channel: String, surveyClient: SurveyClient): ListenerCallback {
         return { source: String, message: Message ->
-            if (isChannelNameValid(source) && source.channelName == channel) {
-                val content = String(message.contents)
-                val sender = source.sender
-                surveyClient.getAnswers().thenCompose { answers ->
-                    answers.filter { answer -> content.contains(answer) }
-                            .mapComposeList { answer -> surveyClient.voteForAnswer(answer, sender) }
-                }
-            } else ImmediateFuture { }
+            isValidRegistration(bot.name, source, channel).thenCompose { valid ->
+                if (valid) {
+                    val content = String(message.contents)
+                    val sender = source.sender
+                    surveyClient.getAnswers().thenCompose { answers ->
+                        answers.filter { answer -> content.contains(answer) } //TODO: check with matan if that should be equals or contains
+                                .mapComposeList { answer -> surveyClient.voteForAnswer(answer, sender) }
+                    }
+                } else ImmediateFuture { }
+
+            }
+
         }
 
     }

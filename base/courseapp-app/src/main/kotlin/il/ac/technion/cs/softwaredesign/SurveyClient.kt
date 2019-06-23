@@ -11,6 +11,8 @@ typealias AnswerCount = Long
 typealias UserName = String
 
 class SurveyClient constructor(private val surveyId: Long, private val botApi: CourseBotApi) {
+    //surevyId_username-> answerIndex
+    // surevyId_answerIndex -> counter
 
     val id = surveyId.toString()
     var question: Question
