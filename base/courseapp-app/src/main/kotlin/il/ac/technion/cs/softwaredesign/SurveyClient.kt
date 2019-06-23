@@ -3,22 +3,36 @@ package il.ac.technion.cs.softwaredesign
 import il.ac.technion.cs.softwaredesign.lib.api.CourseBotApi
 import il.ac.technion.cs.softwaredesign.lib.api.model.Survey
 import il.ac.technion.cs.softwaredesign.lib.utils.thenDispose
+import java.util.concurrent.CompletableFuture
 
-class SurveyClient constructor(val surveyId: Long, private val botApi: CourseBotApi) {
+typealias Answer = String
+typealias Question = String
+typealias AnswerCount = Long
 
-    var question: String
+class SurveyClient constructor(private val surveyId: Long, private val botApi: CourseBotApi) {
+
+    val id = surveyId.toString()
+    var question: Question
         get() {
-            return botApi.findSurvey(surveyId).thenApply { it!!.question }.join()
+            return botApi.findSurvey(id).thenApply { it!!.question }.join()
         }
         set(value) {
-            botApi.updateSurvey(surveyId, Pair(Survey.KEY_QUESTION, value)).thenDispose().join()
+            botApi.updateSurvey(id, Pair(Survey.KEY_QUESTION, value)).thenDispose().join()
         }
 
-    fun putAnswers(answers: List<String>) {
+    fun createQuestion(q: Question): CompletableFuture<SurveyClient> {
+        return botApi.createSurvey(id, q).thenApply { this }
+    }
+
+    fun putAnswers(answers: List<Answer>): CompletableFuture<SurveyClient> {
         TODO()
     }
 
-    fun voteForAnswer(answer: String) {
+    fun voteForAnswer(answer: Answer): CompletableFuture<SurveyClient> {
+        TODO()
+    }
+
+    fun getVotes(): CompletableFuture<List<AnswerCount>> {
         TODO()
     }
 

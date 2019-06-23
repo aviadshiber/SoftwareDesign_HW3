@@ -11,6 +11,7 @@ import il.ac.technion.cs.softwaredesign.lib.api.model.BotsMetadata
 import il.ac.technion.cs.softwaredesign.lib.api.model.Channel
 import il.ac.technion.cs.softwaredesign.lib.db.Counter
 import il.ac.technion.cs.softwaredesign.lib.db.dal.GenericKeyPair
+import il.ac.technion.cs.softwaredesign.lib.utils.mapComposeList
 import il.ac.technion.cs.softwaredesign.lib.utils.thenDispose
 import il.ac.technion.cs.softwaredesign.messages.MediaType
 import il.ac.technion.cs.softwaredesign.messages.Message
@@ -321,13 +322,29 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
 
     override fun runSurvey(channel: String, question: String, answers: List<String>): CompletableFuture<String> {
         return validateBotInChannel(channel)
-                .thenCompose {
-                    TODO()
-                }
+                .thenCompose { generateSurveyId() }.thenCompose { id -> SurveyClient(id, courseBotApi).createQuestion(question) }
+                .thenCompose { survey -> survey.putAnswers(answers).thenApply { survey } }
+                .thenCompose { survey -> courseApp.addListener(bot.token, buildSurveyCallback(channel, survey, answers)).thenApply { survey } }
+                .thenCompose { survey -> messageFactory.create(MediaType.TEXT, question.toByteArray()).thenApply { Pair(survey, it) } }
+                .thenCompose { (survey, m) -> courseApp.channelSend(bot.token, channel, m).thenApply { survey.id } }
+
+        //TODO: ADD TO TREE OF SURVEYS!
     }
 
+    private fun buildSurveyCallback(channel: String, surveyClient: SurveyClient, answers: List<String>): ListenerCallback {
+        return { source: String, message: Message ->
+            if (isChannelNameValid(source) && source.channelName == channel) {
+                val content = String(message.contents)
+                answers.filter { answer -> content.contains(answer) }
+                        .mapComposeList { answer -> surveyClient.voteForAnswer(answer) }
+            } else ImmediateFuture { }
+        }
+
+    }
+
+
     override fun surveyResults(identifier: String): CompletableFuture<List<Long>> {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+        return SurveyClient(identifier.toLong(), courseBotApi).getVotes()
     }
 
     private val String.channelName: String
