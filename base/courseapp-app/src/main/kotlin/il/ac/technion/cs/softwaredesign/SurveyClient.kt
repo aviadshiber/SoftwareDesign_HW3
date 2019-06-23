@@ -28,6 +28,10 @@ class SurveyClient constructor(private val surveyId: Long, private val botApi: C
         TODO()
     }
 
+    fun getAnswers(): CompletableFuture<List<Answer>> {
+        TODO()
+    }
+
     fun voteForAnswer(answer: Answer): CompletableFuture<SurveyClient> {
         TODO()
     }
