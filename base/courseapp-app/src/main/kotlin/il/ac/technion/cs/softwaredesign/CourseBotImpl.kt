@@ -287,17 +287,20 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
 
     // TODO: what if there are more then one user
     override fun mostActiveUser(channel: String): CompletableFuture<String?> {
-        return ImmediateFuture { bot.mostActiveUser }
+        return validateBotInChannel(channel).thenApply { bot.mostActiveUser }
     }
 
     override fun richestUser(channel: String): CompletableFuture<String?> {
-        return courseApp.isUserInChannel(bot.token, channel, bot.name)
-                .recover { if (it !is InvalidTokenException) throw NoSuchEntityException() else throw it }
+        return validateBotInChannel(channel)
                 .thenCompose { CashBalance(channel, bot.name).getTop() }
     }
 
+
     override fun runSurvey(channel: String, question: String, answers: List<String>): CompletableFuture<String> {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+        return validateBotInChannel(channel)
+                .thenCompose {
+                    TODO()
+                }
     }
 
     override fun surveyResults(identifier: String): CompletableFuture<List<Long>> {
@@ -312,6 +315,10 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
         get() {
             return this.substringAfter("@", "")
         }
+
+    private fun validateBotInChannel(channel: String) =
+            courseApp.isUserInChannel(bot.token, channel, bot.name)
+                    .recover { if (it !is InvalidTokenException) throw NoSuchEntityException() else throw it }
 
     private fun shouldBeCountMessage(regex: String?, mediaType: MediaType?, source: String, message: Message): Boolean {
         if (!isChannelNameValid(source)) return false
