@@ -67,8 +67,7 @@ class CourseBotsImpl @Inject constructor(private val courseApp: CourseApp,
                     if (currId == null)
                         courseBotApi.createCounter(KEY_LAST_BOT_ID).thenApply { 0L }
                     else
-                        courseBotApi.updateCounter(KEY_LAST_BOT_ID, currId.value + 1L)
-                                .thenApply { currId.value + 1L }
+                        courseBotApi.updateCounter(KEY_LAST_BOT_ID, currId.value + 1L).thenApply { it.value }
                 }
     }
 

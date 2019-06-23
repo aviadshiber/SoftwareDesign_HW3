@@ -122,7 +122,7 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
                                 }
                                 .thenApply { userCounter ->
                                     val currMax = bot.mostActiveUserCount ?: -1L
-                                    val maxCount = max(currMax, userCounter!!.value)
+                                    val maxCount = max(currMax, userCounter.value)
                                     if (maxCount > currMax) {
                                         bot.mostActiveUser = sender
                                         bot.mostActiveUserCount = maxCount
@@ -150,10 +150,10 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
                 if (!it || !shouldBeCountMessage(regex, mediaType, source, message)) ImmediateFuture { }
                 else {
                     if (channelName == null) {
-                        incCounterValue(globalBotCounterName)!!.thenApply { }
+                        incCounterValue(globalBotCounterName).thenApply { }
                     } else {
                         val channelRegexMediaCounter = combineArgsToString(botName, source.channelName, regex, mediaType)
-                        incCounterValue(channelRegexMediaCounter)!!.thenApply {}
+                        incCounterValue(channelRegexMediaCounter).thenApply {}
                     }
                 }
             }
@@ -202,8 +202,8 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
     private fun restartCounter(key: String): CompletableFuture<Counter> {
         return courseBotApi.findCounter(key)
                 .thenCompose {
-                    if (it == null) courseBotApi.createCounter(key).thenApply { counter -> counter!! }
-                    else courseBotApi.updateCounter(key, 0L).thenApply { counter -> counter!! }
+                    if (it == null) courseBotApi.createCounter(key)
+                    else courseBotApi.updateCounter(key, 0L)
                 }
     }
 
@@ -222,7 +222,11 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
                 .thenCompose { courseApp.addListener(bot.token, countCallback) } //TODO: add listener to storage
     }
 
-    private fun incCounterValue(counterId: String): CompletableFuture<Counter?>? {
+    /**
+     * the method increase the counter with [counterId].
+     * the counter id must exist inorder to use this method!!
+     */
+    private fun incCounterValue(counterId: String): CompletableFuture<Counter> {
         return courseBotApi.findCounter(counterId)
                 .thenCompose { counter -> courseBotApi.updateCounter(counterId, counter!!.value + 1L) }
     }

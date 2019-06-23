@@ -123,18 +123,18 @@ class CourseBotApi @javax.inject.Inject constructor(private val db: Database) {
                 //.thenCompose { channel -> deleteMetadata(CHANNELS_BY_ONLINE_USERS, name).thenApply { channel }}
     }
 
-    fun createCounter(id: String): CompletableFuture<Counter?> {
+    fun createCounter(id: String): CompletableFuture<Counter> {
         return db.document(Counter.TYPE)
                 .create(id)
                 .set(Counter.KEY_VALUE, 0L)
-                .executeFor(Counter::class.java)
+                .executeFor(Counter::class.java).thenApply { it!! }
     }
 
-    fun updateCounter(id: String, value: Long): CompletableFuture<Counter?> {
+    fun updateCounter(id: String, value: Long): CompletableFuture<Counter> {
         return db.document(Counter.TYPE)
                 .update(id)
                 .set(Counter.KEY_VALUE, value)
-                .executeFor(Counter::class.java)
+                .executeFor(Counter::class.java).thenApply { it!! }
     }
 
     fun findCounter(id: String): CompletableFuture<Counter?> {
@@ -153,6 +153,27 @@ class CourseBotApi @javax.inject.Inject constructor(private val db: Database) {
         return db.document(Counter.TYPE)
                 .delete(id, listOf())
                 .executeFor(Counter::class.java)
+    }
+
+    fun createSurvey(id: String, question: String): CompletableFuture<Survey> {
+        return db.document(Survey.TYPE)
+                .create(id)
+                .set(Survey.KEY_QUESTION, question)
+                .executeFor(Survey::class.java).thenApply { it!! }
+    }
+
+    fun updateSurvey(id: String, vararg pairs: Pair<String, Any>): CompletableFuture<Survey> {
+        return db.document(Survey.TYPE)
+                .update(id)
+                .set(*pairs)
+                .executeFor(Survey::class.java).thenApply { it!! }
+    }
+
+    fun findSurvey(id: String): CompletableFuture<Survey?> {
+        val keys = listOf(Survey.KEY_QUESTION)
+        return db.document(Survey.TYPE)
+                .find(id, keys)
+                .executeFor(Survey::class.java)
     }
 
     /**
