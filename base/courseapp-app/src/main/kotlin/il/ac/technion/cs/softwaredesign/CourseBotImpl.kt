@@ -11,7 +11,7 @@ import il.ac.technion.cs.softwaredesign.lib.api.model.BotsMetadata
 import il.ac.technion.cs.softwaredesign.lib.api.model.Channel
 import il.ac.technion.cs.softwaredesign.lib.db.Counter
 import il.ac.technion.cs.softwaredesign.lib.db.dal.GenericKeyPair
-import il.ac.technion.cs.softwaredesign.lib.utils.mapComposeList
+import il.ac.technion.cs.softwaredesign.lib.utils.thenDispose
 import il.ac.technion.cs.softwaredesign.messages.MediaType
 import il.ac.technion.cs.softwaredesign.messages.Message
 import il.ac.technion.cs.softwaredesign.messages.MessageFactory
@@ -174,12 +174,11 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
                 .thenApply { }
     }
 
-    // TODO: check if ok
     private fun isValidRegistration(botName: String, source: String, channelName: String?): CompletableFuture<Boolean> {
         val sourceChannelName = source.channelName
         if (!isChannelNameValid(sourceChannelName) || (channelName != null && sourceChannelName != channelName)) return ImmediateFuture { false }
         return courseBotApi.findChannel(sourceChannelName).thenApply { it!!.channelId }
-                .thenCompose { channelId -> botTreeWrapper.treeContains(Bot.LIST_BOT_CHANNELS, bot.name, GenericKeyPair(channelId, sourceChannelName)) }
+                .thenCompose { channelId -> botTreeWrapper.treeContains(Bot.LIST_BOT_CHANNELS, botName, GenericKeyPair(channelId, sourceChannelName)) }
     }
 
     override fun part(channelName: String): CompletableFuture<Unit> {
@@ -188,14 +187,31 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
         return courseApp.channelPart(bot.token, channelName)
                 .recover { throw NoSuchEntityException() }
                 // channel must be exist at this point
+                .thenCompose { cleanAllBotStatisticsOnChannel(channelName) }
                 .thenCompose { getChannelId(channelName) }
                 .thenCompose { channelId -> removeChannelFromBot(channelName, channelId) }
                 .thenCompose { removeBotFromChannel(channelName) }
-                .thenCompose { courseBotApi.treeGet(msgCounterTreeType, bot.name) }
-                .thenCompose { counters -> counters.mapComposeList { counterId -> invalidateCounter(counterId) } }
                 .thenCompose { courseApp.removeListener(bot.token, buildLastSeenMsgCallback(channelName)) } //TODO: remove listener from storage
                 .thenCompose { courseApp.removeListener(bot.token, buildMostActiveUserCallback(channelName)) } //TODO: remove listener from storage
-                .thenCompose { courseBotApi.treeClean(userMsgCounterTreeType, bot.name) }
+    }
+
+    private fun cleanAllBotStatisticsOnChannel(channelName: String?): CompletableFuture<Unit> {
+        return invalidateCounter(channelName, msgCounterTreeType, bot.name)
+                .thenCompose { invalidateCounter(channelName, userMsgCounterTreeType, bot.name) }
+
+
+    }
+
+    private fun invalidateCounter(channelName: String?, treeType: String, name: String): CompletableFuture<Unit> {
+        return courseBotApi.treeToSequence(treeType, name).thenApply { seq ->
+            seq.filter { (genericKey, _) ->
+                channelName == null || extractChannelFromCombinedString(genericKey.getSecond()) == channelName
+            }.map { (genericKey, _) ->
+                courseBotApi.deleteCounter(genericKey.getSecond()).thenCompose {
+                    courseBotApi.treeRemove(treeType, name, genericKey)
+                }
+            }
+        }.thenDispose()
     }
 
     override fun channels(): CompletableFuture<List<String>> {
@@ -210,16 +226,22 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
                 }
     }
 
-    private fun invalidateCounter(key: String): CompletableFuture<Unit> {
-        return courseBotApi.findCounter(key)
-                .thenCompose {
-                    if (it == null) ImmediateFuture { }
-                    else courseBotApi.deleteCounter(key).thenApply { }
-                }
-    }
+//    private fun invalidateCounter(key: String, treeType: String, name: String): CompletableFuture<Unit> {
+//        return courseBotApi.findCounter(key)
+//                .thenCompose { counter ->
+//                    if (counter == null) ImmediateFuture { }
+//                    else courseBotApi.deleteCounter(key).thenCompose {
+//                                courseBotApi.treeRemove(treeType, name, GenericKeyPair(counter.value, key)) }
+//                            .thenDispose()
+//                }
+//
+//    }
 
     private fun combineArgsToString(vararg values: Any?): String =
             values.joinToString(separator = ",") { it?.toString() ?: "" }
+
+    private fun extractChannelFromCombinedString(s: String): String =
+            s.substringAfter(",").substringBefore(",")
 
     // manage list of pairs (mediaType, regex)
     // in begin - add the pair to the list, and add metadata with counter = 0
@@ -245,8 +267,8 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
     override fun count(channel: String?, regex: String?, mediaType: MediaType?): CompletableFuture<Long> {
         val channelRegexMediaCounter = combineArgsToString(bot.name, channel, regex, mediaType)
         return courseBotApi.findCounter(channelRegexMediaCounter).thenApply {
-                it?.value ?: throw IllegalArgumentException()
-            }
+            it?.value ?: throw IllegalArgumentException()
+        }
 
     }
 
@@ -284,7 +306,7 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
             courseApp.isUserInChannel(bot.token, channelName, destUserName).thenCompose { isDestInChannel ->
                 if (isDestInChannel == true) {
                     val cashBalance = CashBalance(channelName, bot.name)
-                    cashBalance.moveTo(source.sender, destUserName, number.toLong())
+                    cashBalance.transfer(source.sender, destUserName, number.toLong())
                 } else {
                     ImmediateFuture { }
                 }

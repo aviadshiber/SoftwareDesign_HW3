@@ -65,8 +65,6 @@ class CourseBotApi @javax.inject.Inject constructor(private val db: Database) {
      * @param id Long
      * @param name String
      * @param token String
-     * @param lastSeenMessageTime String
-     * @param calculationTrigger String
      * @return CompletableFuture<Bot?>
      */
     fun createBot(name: String, token: String, id: Long): CompletableFuture<Bot?> {
@@ -258,6 +256,8 @@ class CourseBotApi @javax.inject.Inject constructor(private val db: Database) {
                 .thenApply { seq -> seq.toList() }
                 .thenApply { lst -> lst.map { it.first.getSecond() } }
     }
+
+    fun treeToSequence(type: String, name: String) = db.tree(type, name).asSequence()
 
     /**
      * returns the metadata about Users
