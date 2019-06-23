@@ -274,6 +274,10 @@ class CourseBotApi @javax.inject.Inject constructor(private val db: Database) {
         return db.tree(type, name).search(keyPair).thenApply { it != null }
     }
 
+    fun treeSearch(type: String, name: String, keyPair: GenericKeyPair<Long, String>): CompletableFuture<String?> {
+        return db.tree(type, name).search(keyPair)
+    }
+
     /**
      * Retrieve all tree's keys
      * @param type The tree type
