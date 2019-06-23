@@ -28,6 +28,14 @@ class SurveyClient constructor(surveyId: Long, private val botApi: CourseBotApi)
             botApi.updateSurvey(id, Pair(Survey.KEY_QUESTION, value)).thenDispose().join()
         }
 
+    var noAnswers: Long
+        get() {
+            return botApi.findSurvey(id).thenApply { it!!.noAnswers }.join()
+        }
+        set(value) {
+            botApi.updateSurvey(id, Pair(Survey.KEY_NO_ANSWERS, value)).thenDispose().join()
+        }
+
     fun createQuestion(q: Question): CompletableFuture<SurveyClient> {
         return botApi.createSurvey(id, q).thenApply { this }
     }
@@ -36,7 +44,8 @@ class SurveyClient constructor(surveyId: Long, private val botApi: CourseBotApi)
         return answers
                 .mapComposeIndexList { index, answer ->
                     answersTree.treeInsert(Survey.LIST_ANSWERS, id, GenericKeyPair(index.toLong(), answer))
-                }.thenApply { this }
+                }.thenApply { noAnswers = answers.size.toLong() }
+                .thenApply { this }
     }
 
     fun getAnswers(): CompletableFuture<List<Answer>> {
@@ -46,26 +55,32 @@ class SurveyClient constructor(surveyId: Long, private val botApi: CourseBotApi)
     }
 
     fun voteForAnswer(answer: Answer, votingUser: UserName): CompletableFuture<SurveyClient> {
-        return getAnswers().thenApply { it.indexOf(answer) }.thenCompose {
-            if (it >= 0) upsertUserVote(votingUser, it.toLong()).thenApply { this } //todo: change to override of answer
+        return getAnswers().thenApply { it.indexOf(answer) }.thenCompose { currAnsIndex ->
+            if (currAnsIndex >= 0)
+                upsertUserLastAnswer(votingUser, currAnsIndex.toLong()) // this updates last user vote
+                    .thenCompose { prevAnsIndex -> updateAnswersCounters(prevAnsIndex, currAnsIndex.toLong()) } // this update counter
             else ImmediateFuture { this }
         }
     }
 
-    fun getVotes(): CompletableFuture<List<AnswerCount>> {
-        TODO()
+    fun getVoteCounters(): List<AnswerCount> {
+        return (0 until noAnswers).toList().map{ ansIndex ->
+            val counterId = createCounterId(ansIndex)
+            botApi.findCounter(counterId).thenApply { it?.value ?: 0 }.join()
+        }
     }
 
-    /* fun updateCountersUserVote(prevIndex:Long?,currentIndex:Long,u:UserName):CompletableFuture<SurveyClient>{
-         return if(prevIndex==currentIndex) ImmediateFuture { this }
-         else if(prevIndex==null) upsertUserVote(u,currentIndex)
-     }*/
+     private fun updateAnswersCounters(prevIndex:Long?, currentIndex:Long):CompletableFuture<SurveyClient>{
+         return if (prevIndex==currentIndex) ImmediateFuture { this }
+         else if (prevIndex==null) incCounter(currentIndex).thenApply { this }
+         else incCounter(currentIndex).thenCompose { decCounter(prevIndex) }.thenApply { this }
+     }
 
     /**
      * The method update or insert a vote index for a user
      * @return the previous vote index
      */
-    private fun upsertUserVote(u: UserName, index: Long): CompletableFuture<Long?> {
+    private fun upsertUserLastAnswer(u: UserName, index: Long): CompletableFuture<Long?> {
         val voteId = "${id}_$u"
         return botApi.findVoteAnswer(voteId).thenCompose<Long?> { prevVote ->
             if (prevVote == null) botApi.createVoteAnswer(voteId, index).thenApply { null }
@@ -73,16 +88,16 @@ class SurveyClient constructor(surveyId: Long, private val botApi: CourseBotApi)
         }
     }
 
-    private fun incCounter(index: Long): CompletableFuture<Long> {
-        return upsertVoteCounter(index, 1L)
-    }
+    private fun incCounter(index: Long): CompletableFuture<Long> = upsertVoteCounter(index, 1L)
 
-    private fun decCounter(index: Long): CompletableFuture<Long> {
-        return upsertVoteCounter(index, -1L)
-    }
+    private fun decCounter(index: Long): CompletableFuture<Long> = upsertVoteCounter(index, -1L)
+
+    private fun createCounterId(index: Long) = "${id}_$index"
+
+    private fun extractIndexFromCounterId(counterId: String) = counterId.substringAfter("_")
 
     private fun upsertVoteCounter(index: Long, number: Long): CompletableFuture<Long> {
-        val counterId = "${id}_$index"
+        val counterId = createCounterId(index)
         return botApi.findCounter(counterId).thenCompose<Long> { prevCounter ->
             if (prevCounter == null) botApi.createCounter(counterId).thenCompose { botApi.updateCounter(counterId, number) }
                     .thenApply { 0L }

@@ -185,6 +185,7 @@ class CourseBotApi @javax.inject.Inject constructor(private val db: Database) {
         return db.document(Survey.TYPE)
                 .create(id)
                 .set(Survey.KEY_QUESTION, question)
+                .set(Survey.KEY_NO_ANSWERS, 0L)
                 .executeFor(Survey::class.java).thenApply { it!! }
     }
 

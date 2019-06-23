@@ -360,7 +360,7 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
 
 
     override fun surveyResults(identifier: String): CompletableFuture<List<Long>> {
-        return SurveyClient(identifier.toLong(), courseBotApi).getVotes()
+        return ImmediateFuture { SurveyClient(identifier.toLong(), courseBotApi).getVoteCounters() }
     }
 
     private val String.channelName: String
