@@ -77,6 +77,17 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
                 }
     }
 
+    private fun generateSurveyId(): CompletableFuture<Long> {
+        return courseBotApi.findCounter(KEY_LAST_CHANNEL_ID)
+                .thenCompose { currId ->
+                    if (currId == null)
+                        courseBotApi.createCounter(KEY_LAST_CHANNEL_ID).thenApply { 0L }
+                    else
+                        courseBotApi.updateCounter(KEY_LAST_CHANNEL_ID, currId.value + 1L)
+                                .thenApply { currId.value + 1L }
+                }
+    }
+
     // insert pair of (id, name) to keep the list sorted by generation time
     private fun addBotToChannel(channelName: String) =
             channelTreeWrapper.treeInsert(Channel.LIST_BOTS, channelName, GenericKeyPair(bot.id, bot.name))
@@ -144,32 +155,23 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
     }
 
     private fun buildBeginCountCallback(botName: String, channelName: String?, regex: String?, mediaType: MediaType?): ListenerCallback {
-        val globalBotCounterName = combineArgsToString(botName, regex, mediaType)
         return { source: String, message: Message ->
             isValidRegistration(botName, source, channelName).thenCompose {
                 if (!it || !shouldBeCountMessage(regex, mediaType, source, message)) ImmediateFuture { }
                 else {
-                    if (channelName == null) {
-                        incCounterValue(globalBotCounterName).thenApply { }
-                    } else {
-                        val channelRegexMediaCounter = combineArgsToString(botName, source.channelName, regex, mediaType)
-                        incCounterValue(channelRegexMediaCounter).thenApply {}
-                    }
+                    val channelRegexMediaCounter = combineArgsToString(botName, source.channelName, regex, mediaType)
+                    incCounterValue(channelRegexMediaCounter).thenApply {}
                 }
             }
         }
     }
 
-    private fun beginCountCountersInit(botName: String, channelName: String?, regex: String?, mediaType: MediaType?): CompletableFuture<Unit> {
-        val globalBotCounterName = combineArgsToString(botName, regex, mediaType)
-        return if (channelName == null) {
-            restartCounter(globalBotCounterName)
-                    .thenCompose { courseBotApi.treeInsert(msgCounterTreeType, botName, GenericKeyPair(0L, globalBotCounterName)) }.thenApply { }
-        } else {
-            val channelRegexMediaCounter = combineArgsToString(botName, channelName, regex, mediaType)
-            restartCounter(channelRegexMediaCounter)
-                    .thenCompose { courseBotApi.treeInsert(msgCounterTreeType, botName, GenericKeyPair(0L, channelRegexMediaCounter)) }.thenApply { }
-        }
+    private fun beginCountCountersInit(botName: String, channelName: String?, regex: String?, mediaType: MediaType?)
+            : CompletableFuture<Unit> {
+        val channelRegexMediaCounter = combineArgsToString(botName, channelName, regex, mediaType)
+        return restartCounter(channelRegexMediaCounter)
+                .thenCompose { courseBotApi.treeInsert(msgCounterTreeType, botName, GenericKeyPair(0L, channelRegexMediaCounter)) }
+                .thenApply { }
     }
 
     // TODO: check if ok
