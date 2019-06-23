@@ -34,8 +34,10 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
         private const val botsMetadataName = "allBots"
         private const val botsStorageName = "botsStorage"
         const val KEY_LAST_CHANNEL_ID = "lastChannelId"
+        const val KEY_LAST_SURVEY_ID = "lastChannelId"
         private const val msgCounterTreeType = "msgCounter"
         private const val userMsgCounterTreeType = "userMsgCounter"
+        private const val surveyTreeType = "surveyTreeType"
     }
 
     private val channelTreeWrapper: TreeWrapper = TreeWrapper(courseBotApi, "channel_")
@@ -79,12 +81,12 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
     }
 
     private fun generateSurveyId(): CompletableFuture<Long> {
-        return courseBotApi.findCounter(KEY_LAST_CHANNEL_ID)
+        return courseBotApi.findCounter(KEY_LAST_SURVEY_ID)
                 .thenCompose { currId ->
                     if (currId == null)
-                        courseBotApi.createCounter(KEY_LAST_CHANNEL_ID).thenApply { 0L }
+                        courseBotApi.createCounter(KEY_LAST_SURVEY_ID).thenApply { 0L }
                     else
-                        courseBotApi.updateCounter(KEY_LAST_CHANNEL_ID, currId.value + 1L)
+                        courseBotApi.updateCounter(KEY_LAST_SURVEY_ID, currId.value + 1L)
                                 .thenApply { currId.value + 1L }
                 }
     }
@@ -198,6 +200,7 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
     }
 
     private fun cleanAllBotStatisticsOnChannel(channelName: String?): CompletableFuture<Unit> {
+        // TODO: should we invalidate also surveys?
         return invalidateCounter(channelName, msgCounterTreeType, bot.name)
                 .thenCompose { invalidateCounter(channelName, userMsgCounterTreeType, bot.name) }
     }
@@ -327,16 +330,17 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
                 .thenCompose { CashBalance(channel, bot.name).getTop() }
     }
 
-
     override fun runSurvey(channel: String, question: String, answers: List<String>): CompletableFuture<String> {
         return validateBotInChannel(channel)
-                .thenCompose { generateSurveyId() }.thenCompose { id -> SurveyClient(id, courseBotApi).createQuestion(question) }
+                .thenCompose { generateSurveyId() }.thenCompose { id -> SurveyClient(id, bot.name, courseBotApi).createQuestion(question) }
                 .thenCompose { survey -> survey.putAnswers(answers).thenApply { survey } }
                 .thenCompose { survey -> courseApp.addListener(bot.token, buildSurveyCallback(channel, survey)).thenApply { survey } } //TODO: save listener in storage
                 .thenCompose { survey -> messageFactory.create(MediaType.TEXT, question.toByteArray()).thenApply { Pair(survey, it) } }
                 .thenCompose { (survey, m) -> courseApp.channelSend(bot.token, channel, m).thenApply { survey.id } }
-
-        //TODO: ADD TO TREE OF SURVEYS! (for 'part' maybe?)
+                .thenCompose { surveyId ->
+                    val botNameSurveyId = combineArgsToString(bot.name, surveyId.toString())
+                    courseBotApi.treeInsert(surveyTreeType, bot.name, GenericKeyPair(0L, botNameSurveyId)).thenApply { surveyId }
+                }
     }
 
     // botname_channel_surveyId
@@ -351,16 +355,16 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
                                 .mapComposeList { answer -> surveyClient.voteForAnswer(answer, sender) }
                     }
                 } else ImmediateFuture { }
-
             }
-
         }
-
     }
 
-
     override fun surveyResults(identifier: String): CompletableFuture<List<Long>> {
-        return ImmediateFuture { SurveyClient(identifier.toLong(), courseBotApi).getVoteCounters() }
+        return courseBotApi.findSurvey(identifier)
+                    .thenApply {
+                        if(it==null || it.botName != bot.name) throw NoSuchEntityException() // TODO: check if second cond needed
+                        else SurveyClient(identifier.toLong(), bot.name, courseBotApi).getVoteCounters()
+                    }
     }
 
     private val String.channelName: String

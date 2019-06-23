@@ -181,11 +181,12 @@ class CourseBotApi @javax.inject.Inject constructor(private val db: Database) {
                 .executeFor(Counter::class.java)
     }
 
-    fun createSurvey(id: String, question: String): CompletableFuture<Survey> {
+    fun createSurvey(id: String, question: String, botName: String): CompletableFuture<Survey> {
         return db.document(Survey.TYPE)
                 .create(id)
                 .set(Survey.KEY_QUESTION, question)
                 .set(Survey.KEY_NO_ANSWERS, 0L)
+                .set(Survey.KEY_BOT_NAME, botName)
                 .executeFor(Survey::class.java).thenApply { it!! }
     }
 

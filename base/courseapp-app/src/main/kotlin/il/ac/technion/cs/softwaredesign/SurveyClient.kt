@@ -13,7 +13,7 @@ typealias Question = String
 typealias AnswerCount = Long
 typealias UserName = String
 
-class SurveyClient constructor(surveyId: Long, private val botApi: CourseBotApi) {
+class SurveyClient constructor(surveyId: Long, private val botName: String, private val botApi: CourseBotApi) {
     //surevyId_username-> answerIndex
     // surevyId_answerIndex -> counter
 
@@ -37,7 +37,7 @@ class SurveyClient constructor(surveyId: Long, private val botApi: CourseBotApi)
         }
 
     fun createQuestion(q: Question): CompletableFuture<SurveyClient> {
-        return botApi.createSurvey(id, q).thenApply { this }
+        return botApi.createSurvey(id, q, botName).thenApply { this }
     }
 
     fun putAnswers(answers: List<Answer>): CompletableFuture<SurveyClient> {

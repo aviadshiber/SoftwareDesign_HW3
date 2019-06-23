@@ -7,10 +7,12 @@ class Survey : BaseModel() {
         const val TYPE = "survey"
         const val KEY_QUESTION = "question"
         const val KEY_NO_ANSWERS = "noAnswers"
+        const val KEY_BOT_NAME = "botName"
 
         const val LIST_ANSWERS = "answers"
     }
 
     lateinit var question: String
     var noAnswers: Long = 0L
+    lateinit var botName: String
 }
