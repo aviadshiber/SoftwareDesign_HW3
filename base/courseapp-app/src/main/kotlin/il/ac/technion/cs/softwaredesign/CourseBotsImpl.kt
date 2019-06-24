@@ -6,7 +6,9 @@ import il.ac.technion.cs.softwaredesign.lib.api.model.Bot
 import il.ac.technion.cs.softwaredesign.lib.api.model.BotsMetadata
 import il.ac.technion.cs.softwaredesign.lib.api.model.Channel
 import il.ac.technion.cs.softwaredesign.lib.db.dal.GenericKeyPair
+import il.ac.technion.cs.softwaredesign.lib.utils.mapComposeList
 import il.ac.technion.cs.softwaredesign.messages.MessageFactory
+import io.github.vjames19.futures.jdk8.ImmediateFuture
 import io.github.vjames19.futures.jdk8.recoverWith
 import java.util.concurrent.CompletableFuture
 import javax.inject.Inject
@@ -36,20 +38,30 @@ class CourseBotsImpl @Inject constructor(private val courseApp: CourseApp,
     }
 
     override fun start(): CompletableFuture<Unit> {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+        return botTreeWrapper.treeGet(BotsMetadata.ALL_BOTS, botsMetadataName)
+                .thenCompose { it.mapComposeList { botName ->
+                        generateCourseBotFromBotName(botName)
+                                .thenCompose { botImpl -> botImpl.loadAllBotListeners() }
+                    }
+                }
     }
 
     override fun bot(name: String?): CompletableFuture<CourseBot> {
         return generateBotId().thenApply { chooseBotName(name, it) }
                 .thenCompose { (id, botName) -> loginBotIfNotExistFuture(botName, id) }
-                .thenCompose { (token, id, botName) -> courseBotApi.createBot(botName, token, id) }
+                .thenCompose { (token, id, botName) -> courseBotApi.findBot(botName)
+                        .thenCompose { if(it==null) courseBotApi.createBot(botName, token, id) else ImmediateFuture { it }}}
 //                .thenCompose { bot -> courseBotApi.listInsert(BotsMetadata.ALL_BOTS, botsMetadataName, Pair(bot!!.botId, bot.botName).pairToString()).thenApply { bot } }
                 .thenCompose { bot -> botTreeWrapper.treeInsert(BotsMetadata.ALL_BOTS, botsMetadataName, GenericKeyPair(bot!!.botId, bot.botName)).thenApply { bot } }
                 .thenApply { bot -> CourseBotImpl(BotClient(bot!!.botId, bot.botToken, bot.botName, courseBotApi), courseApp, messageFactory, courseBotApi) }
     }
 
-    private fun getBot(name: String): CompletableFuture<Bot?> {
+    private fun generateCourseBotFromBotName(name: String): CompletableFuture<CourseBotImpl> {
         return courseBotApi.findBot(name)
+                .thenApply { bot ->
+                    CourseBotImpl(BotClient(bot!!.botId, bot.botToken, bot.botName, courseBotApi),
+                            courseApp, messageFactory, courseBotApi)
+                }
     }
 
     private fun chooseBotName(name: String?, it: BotId): Pair<BotId, String> =

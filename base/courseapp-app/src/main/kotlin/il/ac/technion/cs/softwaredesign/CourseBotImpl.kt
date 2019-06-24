@@ -98,6 +98,8 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
     private fun removeBotFromChannel(channelName: String) =
             channelTreeWrapper.treeRemove(Channel.LIST_BOTS, channelName, GenericKeyPair(bot.id, bot.name))
 
+    fun getChannelNames() = botTreeWrapper.treeGet(Bot.LIST_BOT_CHANNELS, bot.name)
+
     private fun addChannelToBot(channelName: String, channelId: Long) =
             botTreeWrapper.treeInsert(Bot.LIST_BOT_CHANNELS, bot.name, GenericKeyPair(channelId, channelName))
 
@@ -117,6 +119,20 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
                 .thenCompose { addBotToChannel(channelName) }
                 .thenCompose { courseApp.addListener(bot.token, buildLastSeenMsgCallback(channelName)) } //TODO: add listener to storage
                 .thenCompose { courseApp.addListener(bot.token, buildMostActiveUserCallback(channelName)) } //TODO: add listener to storage
+    }
+
+    fun loadAllBotListeners(): CompletableFuture<Unit> {
+        return getChannelNames()
+                .thenCompose { channelNames -> channelNames.mapComposeList { channelName ->
+                        courseApp.addListener(bot.token, buildLastSeenMsgCallback(channelName))
+                                .thenCompose { courseApp.addListener(bot.token, buildMostActiveUserCallback(channelName)) }
+                                // TODO:
+                                // media, regex type
+                                // survey
+                                // set calculation trigger
+                                // set tip trigger
+                    }
+                }
     }
 
     private fun buildMostActiveUserCallback(channelName: String): ListenerCallback {
