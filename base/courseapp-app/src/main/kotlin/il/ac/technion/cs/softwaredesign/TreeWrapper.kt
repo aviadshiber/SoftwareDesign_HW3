@@ -35,6 +35,11 @@ class TreeWrapper(private val courseBotApi: CourseBotApi, private val objectPref
         return courseBotApi.treeGetMax(newType, name)
     }
 
+    fun treeClean(type: String, name: String): CompletableFuture<Unit> {
+        val newType = "$objectPrefix$type"
+        return courseBotApi.treeClean(newType, name)
+    }
+
     fun treeToSequence(type: String, name: String) =
             courseBotApi.treeToSequence("$objectPrefix$type", name)
 }

@@ -4,6 +4,7 @@ import il.ac.technion.cs.softwaredesign.lib.api.CourseBotApi
 import il.ac.technion.cs.softwaredesign.lib.api.model.Survey
 import il.ac.technion.cs.softwaredesign.lib.db.dal.GenericKeyPair
 import il.ac.technion.cs.softwaredesign.lib.utils.mapComposeIndexList
+import il.ac.technion.cs.softwaredesign.lib.utils.mapComposeList
 import il.ac.technion.cs.softwaredesign.lib.utils.thenDispose
 import io.github.vjames19.futures.jdk8.ImmediateFuture
 import java.util.concurrent.CompletableFuture
@@ -14,11 +15,24 @@ typealias AnswerCount = Long
 typealias UserName = String
 
 class SurveyClient constructor(surveyId: Long, private val botName: String, private val botApi: CourseBotApi) {
-    //surevyId_username-> answerIndex
+    // surevyId_username-> answerIndex
     // surevyId_answerIndex -> counter
-
+    companion object {
+        fun initializeSurveyStatisticsInChannel(surveyId: Long, botName: String, channelName: String, courseBotApi: CourseBotApi): CompletableFuture<Unit> {
+            // ans tree - nothing, surevyId_answerIndex -> 0, users tree - clean, and delete Vote(surevyId_username-> answerIndex)
+            // remove it from survey tree
+            val surveyClient = SurveyClient(surveyId, botName, courseBotApi)
+            if (channelName != surveyClient.channel) return ImmediateFuture {  }
+            return surveyClient.initAnswersCounters()
+                    .thenCompose { it.initUsersAnswers() }.thenApply {  }
+        }
+    }
 
     val answersTree = TreeWrapper(botApi, "surveyAnswers")
+
+    // type = Survey.LIST_S_USERS, name = surveyId, keys: genericKey(0L, username)
+    val usersTree = TreeWrapper(botApi, "surveyUsers")
+
     val id = surveyId.toString()
     var question: Question
         get() {
@@ -36,8 +50,16 @@ class SurveyClient constructor(surveyId: Long, private val botName: String, priv
             botApi.updateSurvey(id, Pair(Survey.KEY_NO_ANSWERS, value)).thenDispose().join()
         }
 
-    fun createQuestion(q: Question): CompletableFuture<SurveyClient> {
-        return botApi.createSurvey(id, q, botName).thenApply { this }
+    var channel: String
+        get() {
+            return botApi.findSurvey(id).thenApply { it!!.surveyChannel }.join()
+        }
+        set(value) {
+            botApi.updateSurvey(id, Pair(Survey.KEY_CHANNEL, value)).thenDispose().join()
+        }
+
+    fun createQuestion(q: Question, channelName: String): CompletableFuture<SurveyClient> {
+        return botApi.createSurvey(id, q, botName, channelName).thenApply { this }
     }
 
     fun putAnswers(answers: List<Answer>): CompletableFuture<SurveyClient> {
@@ -63,6 +85,23 @@ class SurveyClient constructor(surveyId: Long, private val botName: String, priv
         }
     }
 
+    fun initAnswersCounters(): CompletableFuture<SurveyClient> {
+        return (0 until noAnswers).toList().mapComposeIndexList{ ansIndex, _ ->
+            val counterId = createCounterId(ansIndex.toLong())
+            botApi.updateCounter(counterId, 0L)
+        }.thenApply { this }
+    }
+
+    fun initUsersAnswers(): CompletableFuture<SurveyClient> {
+        return usersTree.treeGet(Survey.LIST_S_USERS, id)
+                .thenCompose { it.mapComposeList { u ->
+                        val voteId = createVoteId(u)
+                        botApi.deleteVoteAnswer(voteId)
+                    }
+                }.thenCompose { usersTree.treeClean(Survey.LIST_S_USERS, id) }
+                .thenApply { this }
+    }
+
     fun getVoteCounters(): List<AnswerCount> {
         return (0 until noAnswers).toList().map{ ansIndex ->
             val counterId = createCounterId(ansIndex)
@@ -81,12 +120,18 @@ class SurveyClient constructor(surveyId: Long, private val botName: String, priv
      * @return the previous vote index
      */
     private fun upsertUserLastAnswer(u: UserName, index: Long): CompletableFuture<Long?> {
-        val voteId = "${id}_$u"
+        val voteId = createVoteId(u)
         return botApi.findVoteAnswer(voteId).thenCompose<Long?> { prevVote ->
-            if (prevVote == null) botApi.createVoteAnswer(voteId, index).thenApply { null }
+            if (prevVote == null) {
+                botApi.createVoteAnswer(voteId, index)
+                        .thenCompose { usersTree.treeInsert(Survey.LIST_S_USERS, id, GenericKeyPair(0L, u)) }
+                        .thenApply { null }
+            }
             else botApi.updateVoteAnswer(voteId, index).thenApply { prevVote.answerIndex }
         }
     }
+
+    private fun createVoteId(userName: UserName): String = "${id}_$userName"
 
     private fun incCounter(index: Long): CompletableFuture<Long> = upsertVoteCounter(index, 1L)
 
@@ -104,10 +149,4 @@ class SurveyClient constructor(surveyId: Long, private val botName: String, priv
             else botApi.updateCounter(counterId, prevCounter.value + number).thenApply { prevCounter.value }
         }
     }
-
-
-
-
-
-
 }

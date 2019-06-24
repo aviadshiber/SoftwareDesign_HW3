@@ -332,7 +332,7 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
 
     override fun runSurvey(channel: String, question: String, answers: List<String>): CompletableFuture<String> {
         return validateBotInChannel(channel)
-                .thenCompose { generateSurveyId() }.thenCompose { id -> SurveyClient(id, bot.name, courseBotApi).createQuestion(question) }
+                .thenCompose { generateSurveyId() }.thenCompose { id -> SurveyClient(id, bot.name, courseBotApi).createQuestion(question, channel) }
                 .thenCompose { survey -> survey.putAnswers(answers).thenApply { survey } }
                 .thenCompose { survey -> courseApp.addListener(bot.token, buildSurveyCallback(channel, survey)).thenApply { survey } } //TODO: save listener in storage
                 .thenCompose { survey -> messageFactory.create(MediaType.TEXT, question.toByteArray()).thenApply { Pair(survey, it) } }

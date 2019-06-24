@@ -56,7 +56,9 @@ class CourseBotApi @javax.inject.Inject constructor(private val db: Database) {
      * @return Bot model representing the Bot, or null if the bot does not exist
      */
     fun findBot(name: String): CompletableFuture<Bot?> {
-        val keys = listOf(Bot.KEY_BOT_NAME, Bot.KEY_BOT_TOKEN, Bot.KEY_BOT_LAST_SEEN_MSG_TIME, Bot.KEY_BOT_CALCULATION_TRIGGER)
+        val keys = listOf(Bot.KEY_BOT_ID, Bot.KEY_BOT_NAME, Bot.KEY_BOT_TOKEN, Bot.KEY_BOT_LAST_SEEN_MSG_TIME,
+                Bot.KEY_BOT_CALCULATION_TRIGGER, Bot.KEY_BOT_TIP_TRIGGER,
+                Bot.KEY_BOT_MOST_ACTIVE_USER, Bot.KEY_BOT_MOST_ACTIVE_USER_COUNT)
         return db.document(Bot.TYPE).find(name, keys).executeFor(Bot::class.java)
     }
 
@@ -181,12 +183,13 @@ class CourseBotApi @javax.inject.Inject constructor(private val db: Database) {
                 .executeFor(Counter::class.java)
     }
 
-    fun createSurvey(id: String, question: String, botName: String): CompletableFuture<Survey> {
+    fun createSurvey(id: String, question: String, botName: String, channelName: String): CompletableFuture<Survey> {
         return db.document(Survey.TYPE)
                 .create(id)
                 .set(Survey.KEY_QUESTION, question)
                 .set(Survey.KEY_NO_ANSWERS, 0L)
                 .set(Survey.KEY_BOT_NAME, botName)
+                .set(Survey.KEY_CHANNEL, channelName)
                 .executeFor(Survey::class.java).thenApply { it!! }
     }
 
@@ -198,7 +201,7 @@ class CourseBotApi @javax.inject.Inject constructor(private val db: Database) {
     }
 
     fun findSurvey(id: String): CompletableFuture<Survey?> {
-        val keys = listOf(Survey.KEY_QUESTION)
+        val keys = listOf(Survey.KEY_QUESTION, Survey.KEY_NO_ANSWERS, Survey.KEY_BOT_NAME, Survey.KEY_CHANNEL)
         return db.document(Survey.TYPE)
                 .find(id, keys)
                 .executeFor(Survey::class.java)
