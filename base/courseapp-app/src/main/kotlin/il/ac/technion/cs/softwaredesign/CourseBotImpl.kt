@@ -203,6 +203,14 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
         // TODO: should we invalidate also surveys?
         return invalidateCounter(channelName, msgCounterTreeType, bot.name)
                 .thenCompose { invalidateCounter(channelName, userMsgCounterTreeType, bot.name) }
+                .thenCompose {
+                    if (channelName == null) ImmediateFuture {  }
+                    else
+                        courseBotApi.treeGet(surveyTreeType, bot.name)
+                                .thenCompose { it.mapComposeList { sid->
+                                    SurveyClient.initializeSurveyStatisticsInChannel(sid.toLong(), bot.name, channelName, courseBotApi) } }
+                                        .thenCompose { courseBotApi.treeClean(surveyTreeType, bot.name) }
+                }
     }
 
     private fun invalidateCounter(channelName: String?, treeType: String, name: String): CompletableFuture<Unit> {
