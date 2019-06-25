@@ -131,8 +131,6 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
                     channelNames.mapComposeList { channelName ->
                         courseApp.addListener(bot.token, buildLastSeenMsgCallback(channelName))
                                 .thenCompose { courseApp.addListener(bot.token, buildMostActiveUserCallback(channelName)) }
-                        // TODO:
-                        // survey
                     }
                 }
         val messagesCallbacks = courseBotApi.treeGet(userMsgCounterTreeType, bot.name)
@@ -144,11 +142,20 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
                         courseApp.addListener(bot.token, buildBeginCountCallback(extractedKey.botName, extractedKey.channelName, extractedKey.regex, extractedKey.mediaType))
                     }
                 }
+        val surveys = courseBotApi.treeGet(surveyTreeType, bot.name)
+                .thenCompose {
+                    it.mapComposeList { key ->
+                        val sid = SurveiesTreeKey.buildFromString(key).surveyId
+                        val survey = SurveyClient(sid.toLong(), bot.name, courseBotApi)
+                        courseApp.addListener(bot.token, buildSurveyCallback(survey.channel, survey))
+                    }
+                }.thenDispose()
+
         //this is should be enough to load from storage the triggers (using botClient will do the side effect
         // that was the point of BotClient from the first place)
         val calculationTriggerCallback = setCalculationTrigger(bot.calculationTrigger).thenDispose()
         val tipTriggerCallback = setTipTrigger(bot.tipTrigger).thenDispose()
-        return Future.allAsList(listOf(primitiveCallbacks, messagesCallbacks, calculationTriggerCallback, tipTriggerCallback)).thenDispose()
+        return Future.allAsList(listOf(primitiveCallbacks, messagesCallbacks, calculationTriggerCallback, tipTriggerCallback, surveys)).thenDispose()
     }
 
     private fun buildMostActiveUserCallback(channelName: String): ListenerCallback {
@@ -248,11 +255,7 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
 
     private fun invalidateCounter(channelName: String?, treeType: String, name: String): CompletableFuture<Unit> {
         return courseBotApi.treeToSequence(treeType, name).thenApply { seq ->
-            seq.filter { (genericKey, _) ->
-
-
-                botAndChannelMatchKeyPair(treeType, genericKey, channelName)
-            }
+            seq.filter { (genericKey, _) -> botAndChannelMatchKeyPair(treeType, genericKey, channelName) }
                     .map { (genericKey, _) ->
                         courseBotApi.deleteCounter(genericKey.getSecond()).thenCompose {
                             courseBotApi.treeRemove(treeType, name, genericKey)
@@ -390,10 +393,11 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
                 .thenCompose { survey -> messageFactory.create(MediaType.TEXT, question.toByteArray()).thenApply { Pair(survey, it) } }
                 .thenCompose { (survey, m) -> courseApp.channelSend(bot.token, channel, m).thenApply { survey.id } }
                 .thenCompose { surveyId ->
-                    val botNameSurveyId = combineArgsToString(bot.name, surveyId.toString())
+                    val botNameSurveyId = SurveiesTreeKey(bot.name, surveyId).build()
                     courseBotApi.treeInsert(surveyTreeType, bot.name, GenericKeyPair(0L, botNameSurveyId)).thenApply { surveyId }
                 }
     }
+
 
     // botname_channel_surveyId
     private fun buildSurveyCallback(channel: String, surveyClient: SurveyClient): ListenerCallback {
@@ -496,6 +500,29 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
                     }
                 }
                 return MostActiveUserTreeKey(name, channel, sen)
+            }
+        }
+    }
+
+    data class SurveiesTreeKey(val botName: String, val surveyId: String) {
+
+        fun build() = combineArgsToString(botName, surveyId)
+
+        companion object {
+            fun buildFromString(s: String): SurveiesTreeKey {
+                lateinit var name: String
+                lateinit var sid: String
+                val splitedString = s.split(",", limit = 2)
+                val e = InvalidArgumentException(arrayOf("The string does not match SurveiesTreeKey pattern"))
+                if (splitedString.size > 2) throw e
+                splitedString.forEachIndexed { i, data ->
+                    when (i) {
+                        0 -> name = data
+                        1 -> sid = data
+                        else -> throw e
+                    }
+                }
+                return SurveiesTreeKey(name, sid)
             }
         }
     }
