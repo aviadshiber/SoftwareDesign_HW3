@@ -323,17 +323,17 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
 
 
     override fun setCalculationTrigger(trigger: String?): CompletableFuture<String?> {
-        val regex = calculationTrigger(trigger)
+        val regex = calculationTriggerRegex(trigger)
         return setCallBackForTrigger(Bot::calculationTrigger, trigger, regex) { source: String, message: Message ->
             val content = String(message.contents)
-            val expression = regex.matchEntire(content)!!.groups[1]!!.value
+            val (expression) = regex.find(content)!!.destructured
             val solution = Value(expression).resolve()
             val messageFuture = messageFactory.create(MediaType.TEXT, "$solution".toByteArray())
             messageFuture.thenCompose { courseApp.channelSend(bot.token, source.channelName, it) }
         }
     }
 
-    private fun calculationTrigger(trigger: String?) = "$trigger <[()\\d*+/-\\s]+>".toRegex()
+    private fun calculationTriggerRegex(trigger: String?) = """$trigger ([()\d*+-/]+)"""".toRegex()
 
     private fun setCallBackForTrigger(prop: KMutableProperty1<Bot, String?>, trigger: String?, r: Regex,
                                       action: (source: String, message: Message) -> CompletableFuture<Unit>)
@@ -352,8 +352,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
         val regex = tippingRegex(trigger) //$trigger $number $user
         return setCallBackForTrigger(Bot::tipTrigger, trigger, regex) { source: String, message: Message ->
             val content = String(message.contents)
-            val number = regex.matchEntire(content)!!.groups[1]!!.value
-            val destUserName = regex.matchEntire(content)!!.groups[2]!!.value
+            val (number, destUserName) = regex.find(content)!!.destructured
             val channelName = source.channelName
             courseApp.isUserInChannel(bot.token, channelName, destUserName).thenCompose { isDestInChannel ->
                 if (isDestInChannel == true) {
@@ -366,7 +365,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
         }
     }
 
-    private fun tippingRegex(trigger: String?) = "$trigger <[\\d]+> <.*>".toRegex()
+    private fun tippingRegex(trigger: String?) = """$trigger (\d+) (.*)""".toRegex()
 
     override fun seenTime(user: String): CompletableFuture<LocalDateTime?> {
         return ImmediateFuture { bot.lastSeenMessageTime }

@@ -16,6 +16,7 @@ dependencies {
     testCompile("com.natpryce", "hamkrest", hamkrestVersion)
     testCompile("com.google.inject", "guice", guiceVersion)
     testCompile("com.authzee.kotlinguice4", "kotlin-guice", kotlinGuiceVersion)
+    //testCompile("com.github.aviadshiber","SoftwareDesign_HW2","master-SNAPSHOT")
 
     testImplementation("io.mockk", "mockk", mockkVersion)
 }

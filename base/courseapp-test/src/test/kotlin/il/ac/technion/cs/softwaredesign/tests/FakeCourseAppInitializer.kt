@@ -4,7 +4,7 @@ import il.ac.technion.cs.softwaredesign.CourseAppInitializer
 import io.github.vjames19.futures.jdk8.ImmediateFuture
 import java.util.concurrent.CompletableFuture
 
-class FakeCourseAppInitializerImpl : CourseAppInitializer {
+class FakeCourseAppInitializer : CourseAppInitializer {
     override fun setup(): CompletableFuture<Unit> = ImmediateFuture { }
 
 }

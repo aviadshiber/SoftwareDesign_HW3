@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test
 import java.time.Duration.ofSeconds
 
 class CourseBotStaffTest {
-    private val injector = Guice.createInjector(CourseAppModule(), CourseBotModule(), OurSecureStorageModule())
+    private val injector = Guice.createInjector(CourseAppModule(), CourseBotModule(), TestModule())
 
     init {
         injector.getInstance<CourseAppInitializer>().setup().join()

@@ -38,6 +38,8 @@ subprojects {
         // for listenable future
         compile("com.github.vjames19.kotlin-futures", "kotlin-futures-guava", kotlinFuturesVersion)
         compile("org.jetbrains.dokka:dokka-android-gradle-plugin:$dokkaVersion")
+        //compile("org.jetbrains.kotlin","kotlin-stdlib","1.2.21")
+        
     }
     tasks.withType<KotlinCompile> {
         kotlinOptions.jvmTarget = "1.8"
