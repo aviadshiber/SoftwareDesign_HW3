@@ -13,10 +13,12 @@ import io.github.vjames19.futures.jdk8.ImmediateFuture
 import io.github.vjames19.futures.jdk8.recoverWith
 import java.util.concurrent.CompletableFuture
 import javax.inject.Inject
+import javax.inject.Singleton
 
 
 typealias  BotId = Long
 
+@Singleton
 class CourseBotsImpl @Inject constructor(private val courseApp: CourseApp,
                                          private val courseBotApi: CourseBotApi,
                                          private val messageFactory: MessageFactory

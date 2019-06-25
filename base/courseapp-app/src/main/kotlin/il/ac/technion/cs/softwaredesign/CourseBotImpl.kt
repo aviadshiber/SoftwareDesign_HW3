@@ -404,7 +404,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
                     val content = String(message.contents)
                     val sender = source.sender
                     surveyClient.getAnswers().thenCompose { answers ->
-                        answers.filter { answer -> content.contains(answer) } //TODO: check with matan if that should be equals or contains
+                        answers.filter { answer -> content.contentEquals(answer) } //TODO: check with matan if that should be equals or contains
                                 .mapComposeList { answer -> surveyClient.voteForAnswer(answer, sender) }
                     }
                 } else ImmediateFuture { }

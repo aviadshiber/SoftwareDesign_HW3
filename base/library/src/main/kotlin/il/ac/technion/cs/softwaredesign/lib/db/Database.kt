@@ -9,9 +9,11 @@ import il.ac.technion.cs.softwaredesign.lib.utils.StorageList
 import il.ac.technion.cs.softwaredesign.storage.SecureStorageFactory
 import java.util.concurrent.CompletableFuture
 import javax.inject.Inject
+import javax.inject.Singleton
 
 typealias BalancedLongStringTree = BalancedStorageTree<GenericKeyPair<Long, String>, String>
 
+@Singleton
 class Database @Inject constructor(private val factory: SecureStorageFactory) {
 
     companion object {
