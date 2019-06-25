@@ -144,14 +144,11 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
                         courseApp.addListener(bot.token, buildBeginCountCallback(extractedKey.botName, extractedKey.channelName, extractedKey.regex, extractedKey.mediaType))
                     }
                 }
-        //this is should enough to load from storage the triggers (using botClient will do the side effect
+        //this is should be enough to load from storage the triggers (using botClient will do the side effect
         // that was the point of BotClient from the first place)
-        val triggers = ImmediateFuture {
-            bot.calculationTrigger
-            bot.tipTrigger
-        }.thenDispose()
-
-        return Future.allAsList(listOf(primitiveCallbacks, messagesCallbacks, triggers)).thenDispose()
+        val calculationTriggerCallback = setCalculationTrigger(bot.calculationTrigger).thenDispose()
+        val tipTriggerCallback = setTipTrigger(bot.tipTrigger).thenDispose()
+        return Future.allAsList(listOf(primitiveCallbacks, messagesCallbacks, calculationTriggerCallback, tipTriggerCallback)).thenDispose()
     }
 
     private fun buildMostActiveUserCallback(channelName: String): ListenerCallback {
@@ -326,7 +323,7 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
 
 
     override fun setCalculationTrigger(trigger: String?): CompletableFuture<String?> {
-        val regex = "$trigger <[()\\d*+/-\\s]+>".toRegex()
+        val regex = calculationTrigger(trigger)
         return setCallBackForTrigger(BotClient::calculationTrigger, trigger, regex) { source: String, message: Message ->
             val content = String(message.contents)
             val expression = regex.matchEntire(content)!!.groups[1]!!.value
@@ -335,6 +332,8 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
             messageFuture.thenCompose { courseApp.channelSend(bot.token, source.channelName, it) }
         }
     }
+
+    private fun calculationTrigger(trigger: String?) = "$trigger <[()\\d*+/-\\s]+>".toRegex()
 
     private fun setCallBackForTrigger(prop: KMutableProperty1<BotClient, String?>, trigger: String?, r: Regex,
                                       action: (source: String, message: Message) -> CompletableFuture<Unit>)
@@ -350,7 +349,7 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
     }
 
     override fun setTipTrigger(trigger: String?): CompletableFuture<String?> {
-        val regex = "$trigger <[\\d]+> <.*>".toRegex() //$trigger $number $user
+        val regex = tippingRegex(trigger) //$trigger $number $user
         return setCallBackForTrigger(BotClient::tipTrigger, trigger, regex) { source: String, message: Message ->
             val content = String(message.contents)
             val number = regex.matchEntire(content)!!.groups[1]!!.value
@@ -366,6 +365,8 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
             }
         }
     }
+
+    private fun tippingRegex(trigger: String?) = "$trigger <[\\d]+> <.*>".toRegex()
 
     override fun seenTime(user: String): CompletableFuture<LocalDateTime?> {
         return ImmediateFuture { bot.lastSeenMessageTime }
