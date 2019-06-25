@@ -12,6 +12,7 @@ data class Bot constructor(val id: Long, val token: String, val name: String, pr
         val formatter: DateTimeFormatter = DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm:ss:SSS")
     }
 
+    //TODO create field in databse
     var lastSeenMessageTime: LocalDateTime?
         get() {
             return courseBotApi.findBot(name).thenApply { it!!.lastSeenMessageTime }
@@ -21,7 +22,7 @@ data class Bot constructor(val id: Long, val token: String, val name: String, pr
             val valueToWrite = if (value == null) invalid_value else localDateTimeToString(value)
             courseBotApi.updateBot(name, Pair(BotModel.KEY_BOT_LAST_SEEN_MSG_TIME, valueToWrite)).thenApply { }.join()
         }
-
+    //TODO create field in databse
     var calculationTrigger: String?
         get() {
             return courseBotApi.findBot(name).thenApply { it!!.calculationTrigger }
@@ -31,7 +32,7 @@ data class Bot constructor(val id: Long, val token: String, val name: String, pr
             val valueToWrite = value ?: invalid_value
             courseBotApi.updateBot(name, Pair(BotModel.KEY_BOT_CALCULATION_TRIGGER, valueToWrite)).thenApply { }.join()
         }
-
+    //TODO create field in databse
     var tipTrigger: String?
         get() {
             return courseBotApi.findBot(name).thenApply { it!!.tipTrigger }
@@ -41,7 +42,7 @@ data class Bot constructor(val id: Long, val token: String, val name: String, pr
             val valueToWrite = value ?: invalid_value
             courseBotApi.updateBot(name, Pair(BotModel.KEY_BOT_TIP_TRIGGER, valueToWrite)).thenApply { }.join()
         }
-
+    //TODO create field in databse
     var mostActiveUser: String?
         get() {
             return courseBotApi.findBot(name).thenApply { it!!.mostActiveUser }
@@ -51,7 +52,7 @@ data class Bot constructor(val id: Long, val token: String, val name: String, pr
             val valueToWrite = value ?: invalid_value
             courseBotApi.updateBot(name, Pair(BotModel.KEY_BOT_MOST_ACTIVE_USER, valueToWrite)).thenApply { }.join()
         }
-
+    //TODO create field in databse
     var mostActiveUserCount: Long?
         get() {
             return courseBotApi.findBot(name).thenApply { it!!.mostActiveUserCount }
