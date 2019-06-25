@@ -345,7 +345,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
             if (isChannelNameValid(source) && trigger != null && r matches content) action(source, message)
             else ImmediateFuture { }
         }
-        return courseApp.addListener(bot.token, triggerCallback).thenApply { prev } //TODO: add listener to storage
+        return courseApp.addListener(bot.token, triggerCallback).thenApply { prev }
     }
 
     override fun setTipTrigger(trigger: String?): CompletableFuture<String?> {
@@ -372,7 +372,6 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
         return ImmediateFuture { bot.lastSeenMessageTime }
     }
 
-    // TODO: what if there are more then one user
     override fun mostActiveUser(channel: String): CompletableFuture<String?> {
         return validateBotInChannel(channel).thenApply { bot.mostActiveUser }
     }
@@ -404,7 +403,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
                     val content = String(message.contents)
                     val sender = source.sender
                     surveyClient.getAnswers().thenCompose { answers ->
-                        answers.filter { answer -> content.contentEquals(answer) } //TODO: check with matan if that should be equals or contains
+                        answers.filter { answer -> content.contentEquals(answer) }
                                 .mapComposeList { answer -> surveyClient.voteForAnswer(answer, sender) }
                     }
                 } else ImmediateFuture { }
