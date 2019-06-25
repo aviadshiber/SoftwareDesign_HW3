@@ -8,13 +8,13 @@ import java.util.concurrent.CompletableFuture
 class CashBalance constructor(private val channelName: String, private val botName: String, courseBotApi: CourseBotApi) {
 
     // type = channelName, name = botName, keys: genericKey(money, username)
-    val cashTreeWrapper = TreeWrapper(courseBotApi, "cash__")
+    private val cashTreeWrapper = TreeWrapper(courseBotApi, "cash__")
 
     // type = channelName, name = botName, keys: genericKey(0L, username), values: money
-    val userMoneyTreeWrapper = TreeWrapper(courseBotApi, "userMoney__")
+    private val userMoneyTreeWrapper = TreeWrapper(courseBotApi, "userMoney__")
 
     /**
-     * TODO: this function assumes sec & dest exists in courseApp
+     * Note: this function assumes src & dest users exists in courseApp
      * transfer [money] from [srcUser] to [destUser] or do nothing if [srcUser] has less than [money]
      * @param srcUser String
      * @param destUser String
