@@ -140,13 +140,11 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
                 }
         val messagesCallbacks = courseBotApi.treeGet(userMsgCounterTreeType, bot.name)
                 .thenCompose<Unit> { keys ->
-                    keys.mapComposeList { key ->
+                    keys.filter { key ->
+                        MessageCounterTreeKey.buildFromString(key).botName == bot.name
+                    }.mapComposeList { key ->
                         val extractedKey = MessageCounterTreeKey.buildFromString(key)
-                        if (extractedKey.botName == bot.name) {
-                            courseApp.addListener(bot.token, buildBeginCountCallback(extractedKey.botName, extractedKey.channelName, extractedKey.regex, extractedKey.mediaType))
-                        } else {
-                            ImmediateFuture { }
-                        }
+                        courseApp.addListener(bot.token, buildBeginCountCallback(extractedKey.botName, extractedKey.channelName, extractedKey.regex, extractedKey.mediaType))
                     }
                 }
 
