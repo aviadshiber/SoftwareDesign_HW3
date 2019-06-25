@@ -1,6 +1,7 @@
 package il.ac.technion.cs.softwaredesign
 
 
+import com.sun.javaws.exceptions.InvalidArgumentException
 import il.ac.technion.cs.softwaredesign.exceptions.InvalidTokenException
 import il.ac.technion.cs.softwaredesign.exceptions.NoSuchEntityException
 import il.ac.technion.cs.softwaredesign.exceptions.UserNotAuthorizedException
@@ -16,6 +17,7 @@ import il.ac.technion.cs.softwaredesign.lib.utils.thenDispose
 import il.ac.technion.cs.softwaredesign.messages.MediaType
 import il.ac.technion.cs.softwaredesign.messages.Message
 import il.ac.technion.cs.softwaredesign.messages.MessageFactory
+import io.github.vjames19.futures.jdk8.Future
 import io.github.vjames19.futures.jdk8.ImmediateFuture
 import io.github.vjames19.futures.jdk8.recover
 import java.time.LocalDateTime
@@ -38,6 +40,8 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
         private const val msgCounterTreeType = "msgCounter"
         private const val userMsgCounterTreeType = "userMsgCounter"
         private const val surveyTreeType = "surveyTreeType"
+        fun combineArgsToString(vararg values: Any?): String =
+                values.joinToString(separator = ",") { it?.toString() ?: "" }
     }
 
     private val channelTreeWrapper: TreeWrapper = TreeWrapper(courseBotApi, "channel_")
@@ -122,8 +126,9 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
     }
 
     fun loadAllBotListeners(): CompletableFuture<Unit> {
-        return getChannelNames()
-                .thenCompose { channelNames -> channelNames.mapComposeList { channelName ->
+        val primitiveListeners = getChannelNames()
+                .thenCompose { channelNames ->
+                    channelNames.mapComposeList { channelName ->
                         courseApp.addListener(bot.token, buildLastSeenMsgCallback(channelName))
                                 .thenCompose { courseApp.addListener(bot.token, buildMostActiveUserCallback(channelName)) }
                                 // TODO:
@@ -133,6 +138,9 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
                                 // set tip trigger
                     }
                 }
+//        val msgsListners= courseBotApi.treeGet(userMsgCounterTreeType,bot.name)
+//                .thenCompose { keys->  }
+        return Future.allAsList(listOf(primitiveListeners)).thenDispose()
     }
 
     private fun buildMostActiveUserCallback(channelName: String): ListenerCallback {
@@ -142,7 +150,7 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
                     val sender = source.sender
                     if (sender.isEmpty()) ImmediateFuture { Unit }
                     else {
-                        val key = combineArgsToString(bot.name, channelName, sender)
+                        val key = MostActiveUserTreeKey(bot.name, channelName, sender).build()
                         courseBotApi.treeContains(userMsgCounterTreeType, bot.name, GenericKeyPair(0L, key))
                                 .thenCompose {
                                     courseBotApi.treeInsert(userMsgCounterTreeType, bot.name, GenericKeyPair(0L, key))
@@ -164,6 +172,7 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
         }
     }
 
+
     //botNme_channel
     private fun buildLastSeenMsgCallback(channelName: String): ListenerCallback {
         return { source: String, message: Message ->
@@ -179,8 +188,8 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
             isValidRegistration(botName, source, channelName).thenCompose {
                 if (!it || !shouldBeCountMessage(regex, mediaType, source, message)) ImmediateFuture { }
                 else {
-                    val channelRegexMediaCounter = combineArgsToString(botName, source.channelName, regex, mediaType)
-                    incCounterValue(channelRegexMediaCounter).thenApply {}
+                    val channelRegexMediaCounter = MessageCounterTreeKey(botName, source.channelName, regex, mediaType).build()
+                    incCounterValue(channelRegexMediaCounter).thenDispose()
                 }
             }
         }
@@ -188,10 +197,10 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
 
     private fun beginCountCountersInit(botName: String, channelName: String?, regex: String?, mediaType: MediaType?)
             : CompletableFuture<Unit> {
-        val channelRegexMediaCounter = combineArgsToString(botName, channelName, regex, mediaType)
+        val channelRegexMediaCounter = MessageCounterTreeKey(botName, channelName, regex, mediaType).build()
         return restartCounter(channelRegexMediaCounter)
                 .thenCompose { courseBotApi.treeInsert(msgCounterTreeType, botName, GenericKeyPair(0L, channelRegexMediaCounter)) }
-                .thenApply { }
+                .thenDispose()
     }
 
     private fun isValidRegistration(botName: String, source: String, channelName: String?): CompletableFuture<Boolean> {
@@ -202,8 +211,6 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
     }
 
     override fun part(channelName: String): CompletableFuture<Unit> {
-        //todo: clean statistics (put null in all counters ['begin count'])
-        // TOOD: which statistics exactly?
         return courseApp.channelPart(bot.token, channelName)
                 .recover { throw NoSuchEntityException() }
                 // channel must be exist at this point
@@ -216,7 +223,6 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
     }
 
     private fun cleanAllBotStatisticsOnChannel(channelName: String?): CompletableFuture<Unit> {
-        // TODO: should we invalidate also surveys?
         return invalidateCounter(channelName, msgCounterTreeType, bot.name)
                 .thenCompose { invalidateCounter(channelName, userMsgCounterTreeType, bot.name) }
                 .thenCompose {
@@ -225,13 +231,17 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
                         courseBotApi.treeGet(surveyTreeType, bot.name)
                                 .thenCompose { it.mapComposeList { sid->
                                     SurveyClient.initializeSurveyStatisticsInChannel(sid.toLong(), bot.name, channelName, courseBotApi) } }
-                                        .thenCompose { courseBotApi.treeClean(surveyTreeType, bot.name) }
+                    // .thenCompose { courseBotApi.treeClean(surveyTreeType, bot.name) } //we should never delete the surveys even when bot leave a channel
                 }
     }
 
     private fun invalidateCounter(channelName: String?, treeType: String, name: String): CompletableFuture<Unit> {
         return courseBotApi.treeToSequence(treeType, name).thenApply { seq ->
-            seq.filter { (genericKey, _) -> botAndChannelMatchKeyPair(genericKey, channelName) }
+            seq.filter { (genericKey, _) ->
+
+
+                botAndChannelMatchKeyPair(treeType, genericKey, channelName)
+            }
                     .map { (genericKey, _) ->
                 courseBotApi.deleteCounter(genericKey.getSecond()).thenCompose {
                     courseBotApi.treeRemove(treeType, name, genericKey)
@@ -240,14 +250,23 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
         }.thenDispose()
     }
 
-    private fun botAndChannelMatchKeyPair(genericKey: GenericKeyPair<Long, String>, channelName: String?): Boolean {
+    private fun botAndChannelMatchKeyPair(treeType: String, genericKey: GenericKeyPair<Long, String>, channelName: String?): Boolean {
         val channel = channelName ?: ""
-        val extractedChannelName = extractChannelFromCombinedString(genericKey.getSecond())
-        return extractBotNameFromCombinedString(genericKey.getSecond()) == bot.name && channel == extractedChannelName
-    }
+        //todo change to polymorphic code
+        val extractedChannelName =
+                when (treeType) {
+                    msgCounterTreeType -> MessageCounterTreeKey.buildFromString(genericKey.getSecond()).channelName
+                    userMsgCounterTreeType -> MostActiveUserTreeKey.buildFromString(genericKey.getSecond()).channelName
+                    else -> throw UnsupportedOperationException()
+                }
+        val extractedBotName =
+                when (treeType) {
+                    msgCounterTreeType -> MessageCounterTreeKey.buildFromString(genericKey.getSecond()).botName
+                    userMsgCounterTreeType -> MostActiveUserTreeKey.buildFromString(genericKey.getSecond()).botName
+                    else -> throw UnsupportedOperationException()
+                }
 
-    private fun extractBotNameFromCombinedString(genKey: String): String {
-        return genKey.substringBefore(",", missingDelimiterValue = "shouldNeverGetHere")
+        return extractedBotName == bot.name && channel == extractedChannelName
     }
 
     override fun channels(): CompletableFuture<List<String>> {
@@ -261,13 +280,6 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
                     else courseBotApi.updateCounter(key, 0L)
                 }
     }
-
-
-    private fun combineArgsToString(vararg values: Any?): String =
-            values.joinToString(separator = ",") { it?.toString() ?: "" }
-
-    private fun extractChannelFromCombinedString(s: String): String =
-            s.substringAfter(",", missingDelimiterValue = "").substringBefore(",", missingDelimiterValue = "")
 
     // manage list of pairs (mediaType, regex)
     // in begin - add the pair to the list, and add metadata with counter = 0
@@ -291,12 +303,13 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
     }
 
     override fun count(channel: String?, regex: String?, mediaType: MediaType?): CompletableFuture<Long> {
-        val channelRegexMediaCounter = combineArgsToString(bot.name, channel, regex, mediaType)
+        val channelRegexMediaCounter = MessageCounterTreeKey(bot.name, channel, regex, mediaType).build()
         return courseBotApi.findCounter(channelRegexMediaCounter).thenApply {
             it?.value ?: throw IllegalArgumentException()
         }
 
     }
+
 
     override fun setCalculationTrigger(trigger: String?): CompletableFuture<String?> {
         val regex = "$trigger <[()\\d*+/-\\s]+>".toRegex()
@@ -418,4 +431,57 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
 
     private fun isRegexMatchesMessageContent(regex: String?, message: Message) =
             (regex != null && Regex(regex) matches String(message.contents))
+
+    //TODO: generalize this if we have time
+    data class MessageCounterTreeKey(val botName: String, val channelName: String?, val regex: String?, val mediaType: MediaType?) {
+
+        fun build() = combineArgsToString(botName, channelName, regex, mediaType)
+
+        companion object {
+            fun buildFromString(s: String): MessageCounterTreeKey {
+                lateinit var name: String
+                lateinit var channel: String
+                var r: String? = null
+                var m: MediaType? = null
+                val splitedString = s.split(",", limit = 5)
+                val e = InvalidArgumentException(arrayOf("The string does not match MessageCounterTreeKey pattern"))
+                if (splitedString.size > 4) throw e
+                splitedString.forEachIndexed { i, data ->
+                    when (i) {
+                        0 -> name = data
+                        1 -> channel = data
+                        2 -> r = data
+                        3 -> m = MediaType.values()[data.toInt()]
+                        else -> throw e
+                    }
+                }
+                return MessageCounterTreeKey(name, channel, r, m)
+            }
+        }
+    }
+
+    data class MostActiveUserTreeKey(val botName: String, val channelName: String, val sender: String) {
+
+        fun build() = combineArgsToString(botName, channelName, sender)
+
+        companion object {
+            fun buildFromString(s: String): MostActiveUserTreeKey {
+                lateinit var name: String
+                lateinit var channel: String
+                lateinit var sen: String
+                val splitedString = s.split(",", limit = 3)
+                val e = InvalidArgumentException(arrayOf("The string does not match MostActiveUserTreeKey pattern"))
+                if (splitedString.size > 3) throw e
+                splitedString.forEachIndexed { i, data ->
+                    when (i) {
+                        0 -> name = data
+                        1 -> channel = data
+                        2 -> sen = data
+                        else -> throw e
+                    }
+                }
+                return MostActiveUserTreeKey(name, channel, sen)
+            }
+        }
+    }
 }

@@ -110,9 +110,11 @@ class SurveyClient constructor(surveyId: Long, private val botName: String, priv
     }
 
      private fun updateAnswersCounters(prevIndex:Long?, currentIndex:Long):CompletableFuture<SurveyClient>{
-         return if (prevIndex==currentIndex) ImmediateFuture { this }
-         else if (prevIndex==null) incCounter(currentIndex).thenApply { this }
-         else incCounter(currentIndex).thenCompose { decCounter(prevIndex) }.thenApply { this }
+         return when (prevIndex) {
+             currentIndex -> ImmediateFuture { this }
+             null -> incCounter(currentIndex).thenApply { this }
+             else -> incCounter(currentIndex).thenCompose { decCounter(prevIndex) }.thenApply { this }
+         }
      }
 
     /**
