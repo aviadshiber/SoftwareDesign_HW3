@@ -118,8 +118,8 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
                 .thenCompose { createChannelIfNotExist(channelName) }
                 .thenCompose { channelId -> addChannelToBot(channelName, channelId) }
                 .thenCompose { addBotToChannel(channelName) }
-                .thenCompose { courseApp.addListener(bot.token, buildLastSeenMsgCallback(channelName)) } //TODO: add listener to storage
-                .thenCompose { courseApp.addListener(bot.token, buildMostActiveUserCallback(channelName)) } //TODO: add listener to storage
+                .thenCompose { courseApp.addListener(bot.token, buildLastSeenMsgCallback(channelName)) }
+                .thenCompose { courseApp.addListener(bot.token, buildMostActiveUserCallback(channelName)) }
     }
 
     fun loadAllBotListeners(): CompletableFuture<Unit> {
@@ -230,8 +230,8 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
                 .thenCompose { getChannelId(channelName) }
                 .thenCompose { channelId -> removeChannelFromBot(channelName, channelId) }
                 .thenCompose { removeBotFromChannel(channelName) }
-                .thenCompose { courseApp.removeListener(bot.token, buildLastSeenMsgCallback(channelName)) } //TODO: remove listener from storage
-                .thenCompose { courseApp.removeListener(bot.token, buildMostActiveUserCallback(channelName)) } //TODO: remove listener from storage
+                .thenCompose { courseApp.removeListener(bot.token, buildLastSeenMsgCallback(channelName)) }
+                .thenCompose { courseApp.removeListener(bot.token, buildMostActiveUserCallback(channelName)) }
     }
 
     private fun cleanAllBotStatisticsOnChannel(channelName: String?): CompletableFuture<Unit> {
