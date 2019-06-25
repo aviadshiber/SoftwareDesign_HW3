@@ -28,10 +28,10 @@ class SurveyClient constructor(surveyId: Long, private val botName: String, priv
         }
     }
 
-    val answersTree = TreeWrapper(botApi, "surveyAnswers")
+    private val answersTree = TreeWrapper(botApi, "surveyAnswers")
 
     // type = SurveyModel.LIST_S_USERS, name = surveyId, keys: genericKey(0L, username)
-    val usersTree = TreeWrapper(botApi, "surveyUsers")
+    private val usersTree = TreeWrapper(botApi, "surveyUsers")
 
     val id = surveyId.toString()
     var question: Question
