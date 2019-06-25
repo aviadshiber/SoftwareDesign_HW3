@@ -132,10 +132,7 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
                         courseApp.addListener(bot.token, buildLastSeenMsgCallback(channelName))
                                 .thenCompose { courseApp.addListener(bot.token, buildMostActiveUserCallback(channelName)) }
                         // TODO:
-                        // media, regex type
                         // survey
-                        // set calculation trigger
-                        // set tip trigger
                     }
                 }
         val messagesCallbacks = courseBotApi.treeGet(userMsgCounterTreeType, bot.name)
@@ -147,8 +144,14 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
                         courseApp.addListener(bot.token, buildBeginCountCallback(extractedKey.botName, extractedKey.channelName, extractedKey.regex, extractedKey.mediaType))
                     }
                 }
+        //this is should enough to load from storage the triggers (using botClient will do the side effect
+        // that was the point of BotClient from the first place)
+        val triggers = ImmediateFuture {
+            bot.calculationTrigger
+            bot.tipTrigger
+        }.thenDispose()
 
-        return Future.allAsList(listOf(primitiveCallbacks, messagesCallbacks)).thenDispose()
+        return Future.allAsList(listOf(primitiveCallbacks, messagesCallbacks, triggers)).thenDispose()
     }
 
     private fun buildMostActiveUserCallback(channelName: String): ListenerCallback {
