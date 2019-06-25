@@ -1,13 +1,21 @@
-package il.ac.technion.cs.softwaredesign.lib.api
+package il.ac.technion.cs.softwaredesign.services
 
-import il.ac.technion.cs.softwaredesign.lib.api.model.*
+import com.google.inject.Singleton
+import il.ac.technion.cs.softwaredesign.lib.api.model.Channel
+import il.ac.technion.cs.softwaredesign.lib.api.model.Session
+import il.ac.technion.cs.softwaredesign.lib.api.model.User
+import il.ac.technion.cs.softwaredesign.lib.api.model.UsersMetadata
 import il.ac.technion.cs.softwaredesign.lib.db.Counter
 import il.ac.technion.cs.softwaredesign.lib.db.Database
 import il.ac.technion.cs.softwaredesign.lib.db.dal.GenericKeyPair
 import il.ac.technion.cs.softwaredesign.lib.utils.generateToken
+import il.ac.technion.cs.softwaredesign.models.BotModel
+import il.ac.technion.cs.softwaredesign.models.SurveyModel
+import il.ac.technion.cs.softwaredesign.models.VoteAnswerModel
 import io.github.vjames19.futures.jdk8.ImmediateFuture
 import java.util.concurrent.CompletableFuture
 
+@Singleton
 class CourseBotApi @javax.inject.Inject constructor(private val db: Database) {
 
     companion object {
@@ -53,38 +61,38 @@ class CourseBotApi @javax.inject.Inject constructor(private val db: Database) {
     /**
      * find a bot in the storage
      * @param name
-     * @return Bot model representing the Bot, or null if the bot does not exist
+     * @return BotModel model representing the BotModel, or null if the bot does not exist
      */
-    fun findBot(name: String): CompletableFuture<Bot?> {
-        val keys = listOf(Bot.KEY_BOT_ID, Bot.KEY_BOT_NAME, Bot.KEY_BOT_TOKEN, Bot.KEY_BOT_LAST_SEEN_MSG_TIME,
-                Bot.KEY_BOT_CALCULATION_TRIGGER, Bot.KEY_BOT_TIP_TRIGGER,
-                Bot.KEY_BOT_MOST_ACTIVE_USER, Bot.KEY_BOT_MOST_ACTIVE_USER_COUNT)
-        return db.document(Bot.TYPE).find(name, keys).executeFor(Bot::class.java)
+    fun findBot(name: String): CompletableFuture<BotModel?> {
+        val keys = listOf(BotModel.KEY_BOT_ID, BotModel.KEY_BOT_NAME, BotModel.KEY_BOT_TOKEN, BotModel.KEY_BOT_LAST_SEEN_MSG_TIME,
+                BotModel.KEY_BOT_CALCULATION_TRIGGER, BotModel.KEY_BOT_TIP_TRIGGER,
+                BotModel.KEY_BOT_MOST_ACTIVE_USER, BotModel.KEY_BOT_MOST_ACTIVE_USER_COUNT)
+        return db.document(BotModel.TYPE).find(name, keys).executeFor(BotModel::class.java)
     }
 
     /**
-     * Create new Bot
+     * Create new BotModel
      * @param id Long
      * @param name String
      * @param token String
-     * @return CompletableFuture<Bot?>
+     * @return CompletableFuture<BotModel?>
      */
-    fun createBot(name: String, token: String, id: Long): CompletableFuture<Bot?> {
-        return db.document(Bot.TYPE)
+    fun createBot(name: String, token: String, id: Long): CompletableFuture<BotModel?> {
+        return db.document(BotModel.TYPE)
                 .create(name)
-                .set(Bot.KEY_BOT_ID, id)
-                .set(Bot.KEY_BOT_NAME, name)
-                .set(Bot.KEY_BOT_TOKEN, token)
-                .set(Bot.KEY_BOT_LAST_SEEN_MSG_TIME, "")
-                .set(Bot.KEY_BOT_CALCULATION_TRIGGER, "")
-                .executeFor(Bot::class.java)
+                .set(BotModel.KEY_BOT_ID, id)
+                .set(BotModel.KEY_BOT_NAME, name)
+                .set(BotModel.KEY_BOT_TOKEN, token)
+                .set(BotModel.KEY_BOT_LAST_SEEN_MSG_TIME, "")
+                .set(BotModel.KEY_BOT_CALCULATION_TRIGGER, "")
+                .executeFor(BotModel::class.java)
     }
 
-    fun updateBot(name: String, vararg pairs: Pair<String, Any>): CompletableFuture<Bot?> {
+    fun updateBot(name: String, vararg pairs: Pair<String, Any>): CompletableFuture<BotModel?> {
         return db.document(User.TYPE)
                 .update(name)
                 .set(*pairs)
-                .executeFor(Bot::class.java)
+                .executeFor(BotModel::class.java)
     }
 
     fun findChannel(name: String): CompletableFuture<Channel?> {
@@ -120,35 +128,35 @@ class CourseBotApi @javax.inject.Inject constructor(private val db: Database) {
         return db.document(Channel.TYPE)
                 .delete(name, listOf())
                 .executeFor(Channel::class.java)
-                //.thenCompose { channel -> deleteMetadata(CHANNELS_BY_USERS,name).thenApply { channel } }
-                //.thenCompose { channel -> deleteMetadata(CHANNELS_BY_ONLINE_USERS, name).thenApply { channel }}
+        //.thenCompose { channel -> deleteMetadata(CHANNELS_BY_USERS,name).thenApply { channel } }
+        //.thenCompose { channel -> deleteMetadata(CHANNELS_BY_ONLINE_USERS, name).thenApply { channel }}
     }
 
-    fun createVoteAnswer(id: String, answerIndex: Long): CompletableFuture<VoteAnswer> {
-        return db.document(VoteAnswer.TYPE)
+    fun createVoteAnswer(id: String, answerIndex: Long): CompletableFuture<VoteAnswerModel> {
+        return db.document(VoteAnswerModel.TYPE)
                 .create(id)
-                .set(VoteAnswer.KEY_ANSWER_INDEX, answerIndex)
-                .executeFor(VoteAnswer::class.java).thenApply { it!! }
+                .set(VoteAnswerModel.KEY_ANSWER_INDEX, answerIndex)
+                .executeFor(VoteAnswerModel::class.java).thenApply { it!! }
     }
 
-    fun updateVoteAnswer(id: String, answerIndex: Long): CompletableFuture<VoteAnswer> {
-        return db.document(VoteAnswer.TYPE)
+    fun updateVoteAnswer(id: String, answerIndex: Long): CompletableFuture<VoteAnswerModel> {
+        return db.document(VoteAnswerModel.TYPE)
                 .update(id)
-                .set(VoteAnswer.KEY_ANSWER_INDEX, answerIndex)
-                .executeFor(VoteAnswer::class.java).thenApply { it!! }
+                .set(VoteAnswerModel.KEY_ANSWER_INDEX, answerIndex)
+                .executeFor(VoteAnswerModel::class.java).thenApply { it!! }
     }
 
-    fun findVoteAnswer(id: String): CompletableFuture<VoteAnswer?> {
-        val keys = listOf(VoteAnswer.KEY_ANSWER_INDEX)
-        return db.document(VoteAnswer.TYPE)
+    fun findVoteAnswer(id: String): CompletableFuture<VoteAnswerModel?> {
+        val keys = listOf(VoteAnswerModel.KEY_ANSWER_INDEX)
+        return db.document(VoteAnswerModel.TYPE)
                 .find(id, keys)
-                .executeFor(VoteAnswer::class.java)
+                .executeFor(VoteAnswerModel::class.java)
     }
 
-    fun deleteVoteAnswer(id: String): CompletableFuture<VoteAnswer?> {
-        return db.document(VoteAnswer.TYPE)
-                .delete(id, listOf(VoteAnswer.KEY_ANSWER_INDEX))
-                .executeFor(VoteAnswer::class.java)
+    fun deleteVoteAnswer(id: String): CompletableFuture<VoteAnswerModel?> {
+        return db.document(VoteAnswerModel.TYPE)
+                .delete(id, listOf(VoteAnswerModel.KEY_ANSWER_INDEX))
+                .executeFor(VoteAnswerModel::class.java)
     }
 
     fun createCounter(id: String): CompletableFuture<Counter> {
@@ -183,28 +191,28 @@ class CourseBotApi @javax.inject.Inject constructor(private val db: Database) {
                 .executeFor(Counter::class.java)
     }
 
-    fun createSurvey(id: String, question: String, botName: String, channelName: String): CompletableFuture<Survey> {
-        return db.document(Survey.TYPE)
+    fun createSurvey(id: String, question: String, botName: String, channelName: String): CompletableFuture<SurveyModel> {
+        return db.document(SurveyModel.TYPE)
                 .create(id)
-                .set(Survey.KEY_QUESTION, question)
-                .set(Survey.KEY_NO_ANSWERS, 0L)
-                .set(Survey.KEY_BOT_NAME, botName)
-                .set(Survey.KEY_CHANNEL, channelName)
-                .executeFor(Survey::class.java).thenApply { it!! }
+                .set(SurveyModel.KEY_QUESTION, question)
+                .set(SurveyModel.KEY_NO_ANSWERS, 0L)
+                .set(SurveyModel.KEY_BOT_NAME, botName)
+                .set(SurveyModel.KEY_CHANNEL, channelName)
+                .executeFor(SurveyModel::class.java).thenApply { it!! }
     }
 
-    fun updateSurvey(id: String, vararg pairs: Pair<String, Any>): CompletableFuture<Survey> {
-        return db.document(Survey.TYPE)
+    fun updateSurvey(id: String, vararg pairs: Pair<String, Any>): CompletableFuture<SurveyModel> {
+        return db.document(SurveyModel.TYPE)
                 .update(id)
                 .set(*pairs)
-                .executeFor(Survey::class.java).thenApply { it!! }
+                .executeFor(SurveyModel::class.java).thenApply { it!! }
     }
 
-    fun findSurvey(id: String): CompletableFuture<Survey?> {
-        val keys = listOf(Survey.KEY_QUESTION, Survey.KEY_NO_ANSWERS, Survey.KEY_BOT_NAME, Survey.KEY_CHANNEL)
-        return db.document(Survey.TYPE)
+    fun findSurvey(id: String): CompletableFuture<SurveyModel?> {
+        val keys = listOf(SurveyModel.KEY_QUESTION, SurveyModel.KEY_NO_ANSWERS, SurveyModel.KEY_BOT_NAME, SurveyModel.KEY_CHANNEL)
+        return db.document(SurveyModel.TYPE)
                 .find(id, keys)
-                .executeFor(Survey::class.java)
+                .executeFor(SurveyModel::class.java)
     }
 
     /**

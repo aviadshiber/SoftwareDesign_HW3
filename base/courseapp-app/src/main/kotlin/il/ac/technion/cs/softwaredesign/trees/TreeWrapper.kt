@@ -1,7 +1,7 @@
-package il.ac.technion.cs.softwaredesign
+package il.ac.technion.cs.softwaredesign.trees
 
-import il.ac.technion.cs.softwaredesign.lib.api.CourseBotApi
 import il.ac.technion.cs.softwaredesign.lib.db.dal.GenericKeyPair
+import il.ac.technion.cs.softwaredesign.services.CourseBotApi
 import java.util.concurrent.CompletableFuture
 
 class TreeWrapper(private val courseBotApi: CourseBotApi, private val objectPrefix: String) {

@@ -1,13 +1,14 @@
 package il.ac.technion.cs.softwaredesign
 
 import il.ac.technion.cs.softwaredesign.exceptions.UserAlreadyLoggedInException
-import il.ac.technion.cs.softwaredesign.lib.api.CourseBotApi
-import il.ac.technion.cs.softwaredesign.lib.api.model.Bot
-import il.ac.technion.cs.softwaredesign.lib.api.model.BotsMetadata
 import il.ac.technion.cs.softwaredesign.lib.api.model.Channel
 import il.ac.technion.cs.softwaredesign.lib.db.dal.GenericKeyPair
 import il.ac.technion.cs.softwaredesign.lib.utils.mapComposeList
 import il.ac.technion.cs.softwaredesign.messages.MessageFactory
+import il.ac.technion.cs.softwaredesign.models.BotsModel
+import il.ac.technion.cs.softwaredesign.services.Bot
+import il.ac.technion.cs.softwaredesign.services.CourseBotApi
+import il.ac.technion.cs.softwaredesign.trees.TreeWrapper
 import io.github.vjames19.futures.jdk8.ImmediateFuture
 import io.github.vjames19.futures.jdk8.recoverWith
 import java.util.concurrent.CompletableFuture
@@ -17,7 +18,7 @@ import javax.inject.Inject
 typealias  BotId = Long
 
 class CourseBotsImpl @Inject constructor(private val courseApp: CourseApp,
-                                         private val courseBotApi: CourseBotApi, // TODO: should be a singleton
+                                         private val courseBotApi: CourseBotApi,
                                          private val messageFactory: MessageFactory
 ) : CourseBots {
 
@@ -29,16 +30,17 @@ class CourseBotsImpl @Inject constructor(private val courseApp: CourseApp,
 
     companion object {
         private const val botDefaultName = "Anna"
-        private const val botsMetadataName = "allBots"
+        private const val botsTreeName = "allBots"
         const val KEY_LAST_BOT_ID = "lastBotId"
     }
 
     override fun prepare(): CompletableFuture<Unit> {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+        //TODO: not sure in anything should happen here
+        return ImmediateFuture { }
     }
 
     override fun start(): CompletableFuture<Unit> {
-        return botTreeWrapper.treeGet(BotsMetadata.ALL_BOTS, botsMetadataName)
+        return botTreeWrapper.treeGet(BotsModel.ALL_BOTS, botsTreeName)
                 .thenCompose { it.mapComposeList { botName ->
                         generateCourseBotFromBotName(botName)
                                 .thenCompose { botImpl -> botImpl.loadAllBotListeners() }
@@ -51,15 +53,14 @@ class CourseBotsImpl @Inject constructor(private val courseApp: CourseApp,
                 .thenCompose { (id, botName) -> loginBotIfNotExistFuture(botName, id) }
                 .thenCompose { (token, id, botName) -> courseBotApi.findBot(botName)
                         .thenCompose { if(it==null) courseBotApi.createBot(botName, token, id) else ImmediateFuture { it }}}
-//                .thenCompose { bot -> courseBotApi.listInsert(BotsMetadata.ALL_BOTS, botsMetadataName, Pair(bot!!.botId, bot.botName).pairToString()).thenApply { bot } }
-                .thenCompose { bot -> botTreeWrapper.treeInsert(BotsMetadata.ALL_BOTS, botsMetadataName, GenericKeyPair(bot!!.botId, bot.botName)).thenApply { bot } }
-                .thenApply { bot -> CourseBotImpl(BotClient(bot!!.botId, bot.botToken, bot.botName, courseBotApi), courseApp, messageFactory, courseBotApi) }
+                .thenCompose { bot -> botTreeWrapper.treeInsert(BotsModel.ALL_BOTS, botsTreeName, GenericKeyPair(bot!!.botId, bot.botName)).thenApply { bot } }
+                .thenApply { bot -> CourseBotImpl(Bot(bot!!.botId, bot.botToken, bot.botName, courseBotApi), courseApp, messageFactory, courseBotApi) }
     }
 
     private fun generateCourseBotFromBotName(name: String): CompletableFuture<CourseBotImpl> {
         return courseBotApi.findBot(name)
                 .thenApply { bot ->
-                    CourseBotImpl(BotClient(bot!!.botId, bot.botToken, bot.botName, courseBotApi),
+                    CourseBotImpl(Bot(bot!!.botId, bot.botToken, bot.botName, courseBotApi),
                             courseApp, messageFactory, courseBotApi)
                 }
     }
@@ -68,9 +69,9 @@ class CourseBotsImpl @Inject constructor(private val courseApp: CourseApp,
             if (name == null) Pair(it, "$botDefaultName$it") else Pair(it, name)
 
     private fun loginBotIfNotExistFuture(botName: String, id: Long): CompletableFuture<Triple<String, Long, String>>? =
-            courseApp.login(botName, "").recoverWith {
-                if (it !is UserAlreadyLoggedInException) throw it
-                else courseBotApi.findBot(botName).thenApply { it!!.botToken }
+            courseApp.login(botName, "").recoverWith { e ->
+                if (e !is UserAlreadyLoggedInException) throw e
+                else courseBotApi.findBot(botName).thenApply { bot -> bot!!.botToken }
             } .thenApply { token: String -> Triple(token, id, botName) }
 
     private fun generateBotId(): CompletableFuture<Long> {
@@ -83,11 +84,9 @@ class CourseBotsImpl @Inject constructor(private val courseApp: CourseApp,
                 }
     }
 
-    // TODO: what if channel does not exists?
-    // TODO: check what happened if list is empty (null?)
     override fun bots(channel: String?): CompletableFuture<List<String>> {
             return if (channel == null)
-                botTreeWrapper.treeGet(BotsMetadata.ALL_BOTS, botsMetadataName)
+                botTreeWrapper.treeGet(BotsModel.ALL_BOTS, botsTreeName)
             else
                 channelTreeWrapper.treeGet(Channel.LIST_BOTS, channel)
     }

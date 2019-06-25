@@ -6,9 +6,6 @@ import il.ac.technion.cs.softwaredesign.exceptions.InvalidTokenException
 import il.ac.technion.cs.softwaredesign.exceptions.NoSuchEntityException
 import il.ac.technion.cs.softwaredesign.exceptions.UserNotAuthorizedException
 import il.ac.technion.cs.softwaredesign.expressionsolver.Value
-import il.ac.technion.cs.softwaredesign.lib.api.CourseBotApi
-import il.ac.technion.cs.softwaredesign.lib.api.model.Bot
-import il.ac.technion.cs.softwaredesign.lib.api.model.BotsMetadata
 import il.ac.technion.cs.softwaredesign.lib.api.model.Channel
 import il.ac.technion.cs.softwaredesign.lib.db.Counter
 import il.ac.technion.cs.softwaredesign.lib.db.dal.GenericKeyPair
@@ -17,6 +14,13 @@ import il.ac.technion.cs.softwaredesign.lib.utils.thenDispose
 import il.ac.technion.cs.softwaredesign.messages.MediaType
 import il.ac.technion.cs.softwaredesign.messages.Message
 import il.ac.technion.cs.softwaredesign.messages.MessageFactory
+import il.ac.technion.cs.softwaredesign.models.BotModel
+import il.ac.technion.cs.softwaredesign.models.BotsModel
+import il.ac.technion.cs.softwaredesign.services.Bot
+import il.ac.technion.cs.softwaredesign.services.CashBalance
+import il.ac.technion.cs.softwaredesign.services.CourseBotApi
+import il.ac.technion.cs.softwaredesign.services.SurveyClient
+import il.ac.technion.cs.softwaredesign.trees.TreeWrapper
 import io.github.vjames19.futures.jdk8.Future
 import io.github.vjames19.futures.jdk8.ImmediateFuture
 import io.github.vjames19.futures.jdk8.recover
@@ -26,7 +30,7 @@ import kotlin.math.max
 import kotlin.reflect.KMutableProperty1
 
 
-class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp, private val messageFactory: MessageFactory,
+class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, private val messageFactory: MessageFactory,
                     private val courseBotApi: CourseBotApi
 ) : CourseBot {
 
@@ -47,12 +51,6 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
     private val channelTreeWrapper: TreeWrapper = TreeWrapper(courseBotApi, "channel_")
     private val botTreeWrapper: TreeWrapper = TreeWrapper(courseBotApi, "bot_")
 
-    init {
-        /*
-        TODO: 1.load all listeners from storage
-              2.use tree for channels bot is in
-         */
-    }
 
     // TODO: 2 options: list insert will get id.toString() or channel name
     // if name - long name can be a problem
@@ -65,7 +63,7 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
                                 .thenCompose { id ->
                                     courseBotApi.createChannel(channelName, id).thenApply { id }
                                 }.thenCompose { id ->
-                                    channelTreeWrapper.treeInsert(BotsMetadata.ALL_CHANNELS, botsMetadataName, GenericKeyPair(0L, channelName)).thenApply { id }
+                                    channelTreeWrapper.treeInsert(BotsModel.ALL_CHANNELS, botsMetadataName, GenericKeyPair(0L, channelName)).thenApply { id }
                                 }
                     } else ImmediateFuture { it.channelId }
                 }
@@ -102,13 +100,13 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
     private fun removeBotFromChannel(channelName: String) =
             channelTreeWrapper.treeRemove(Channel.LIST_BOTS, channelName, GenericKeyPair(bot.id, bot.name))
 
-    fun getChannelNames() = botTreeWrapper.treeGet(Bot.LIST_BOT_CHANNELS, bot.name)
+    fun getChannelNames() = botTreeWrapper.treeGet(BotModel.LIST_BOT_CHANNELS, bot.name)
 
     private fun addChannelToBot(channelName: String, channelId: Long) =
-            botTreeWrapper.treeInsert(Bot.LIST_BOT_CHANNELS, bot.name, GenericKeyPair(channelId, channelName))
+            botTreeWrapper.treeInsert(BotModel.LIST_BOT_CHANNELS, bot.name, GenericKeyPair(channelId, channelName))
 
     private fun removeChannelFromBot(channelName: String, channelId: Long) =
-            botTreeWrapper.treeRemove(Bot.LIST_BOT_CHANNELS, bot.name, GenericKeyPair(channelId, channelName))
+            botTreeWrapper.treeRemove(BotModel.LIST_BOT_CHANNELS, bot.name, GenericKeyPair(channelId, channelName))
 
     private fun isChannelNameValid(s: String) = channelNameRule matches s.channelName
 
@@ -152,7 +150,7 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
                 }.thenDispose()
 
         //this is should be enough to load from storage the triggers (using botClient will do the side effect
-        // that was the point of BotClient from the first place)
+        // that was the point of Bot from the first place)
         val calculationTriggerCallback = setCalculationTrigger(bot.calculationTrigger).thenDispose()
         val tipTriggerCallback = setTipTrigger(bot.tipTrigger).thenDispose()
         return Future.allAsList(listOf(primitiveCallbacks, messagesCallbacks, calculationTriggerCallback, tipTriggerCallback, surveys)).thenDispose()
@@ -222,7 +220,7 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
         val sourceChannelName = source.channelName
         if (!isChannelNameValid(sourceChannelName) || (channelName != null && sourceChannelName != channelName)) return ImmediateFuture { false }
         return courseBotApi.findChannel(sourceChannelName).thenApply { it!!.channelId }
-                .thenCompose { channelId -> botTreeWrapper.treeContains(Bot.LIST_BOT_CHANNELS, botName, GenericKeyPair(channelId, sourceChannelName)) }
+                .thenCompose { channelId -> botTreeWrapper.treeContains(BotModel.LIST_BOT_CHANNELS, botName, GenericKeyPair(channelId, sourceChannelName)) }
     }
 
     override fun part(channelName: String): CompletableFuture<Unit> {
@@ -284,7 +282,7 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
     }
 
     override fun channels(): CompletableFuture<List<String>> {
-        return botTreeWrapper.treeGet(Bot.LIST_BOT_CHANNELS, bot.name)
+        return botTreeWrapper.treeGet(BotModel.LIST_BOT_CHANNELS, bot.name)
     }
 
     private fun restartCounter(key: String): CompletableFuture<Counter> {
@@ -327,7 +325,7 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
 
     override fun setCalculationTrigger(trigger: String?): CompletableFuture<String?> {
         val regex = calculationTrigger(trigger)
-        return setCallBackForTrigger(BotClient::calculationTrigger, trigger, regex) { source: String, message: Message ->
+        return setCallBackForTrigger(Bot::calculationTrigger, trigger, regex) { source: String, message: Message ->
             val content = String(message.contents)
             val expression = regex.matchEntire(content)!!.groups[1]!!.value
             val solution = Value(expression).resolve()
@@ -338,7 +336,7 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
 
     private fun calculationTrigger(trigger: String?) = "$trigger <[()\\d*+/-\\s]+>".toRegex()
 
-    private fun setCallBackForTrigger(prop: KMutableProperty1<BotClient, String?>, trigger: String?, r: Regex,
+    private fun setCallBackForTrigger(prop: KMutableProperty1<Bot, String?>, trigger: String?, r: Regex,
                                       action: (source: String, message: Message) -> CompletableFuture<Unit>)
             : CompletableFuture<String?> {
         val prev = prop.get(bot)
@@ -353,7 +351,7 @@ class CourseBotImpl(private val bot: BotClient, private val courseApp: CourseApp
 
     override fun setTipTrigger(trigger: String?): CompletableFuture<String?> {
         val regex = tippingRegex(trigger) //$trigger $number $user
-        return setCallBackForTrigger(BotClient::tipTrigger, trigger, regex) { source: String, message: Message ->
+        return setCallBackForTrigger(Bot::tipTrigger, trigger, regex) { source: String, message: Message ->
             val content = String(message.contents)
             val number = regex.matchEntire(content)!!.groups[1]!!.value
             val destUserName = regex.matchEntire(content)!!.groups[2]!!.value
