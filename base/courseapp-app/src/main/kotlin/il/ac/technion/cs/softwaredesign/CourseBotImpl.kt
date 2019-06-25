@@ -38,11 +38,10 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
     internal companion object {
         val channelNameRule = "#[#_A-Za-z0-9]*".toRegex()
         private const val botsMetadataName = "allBots"
-        private const val botsStorageName = "botsStorage"
         const val KEY_LAST_CHANNEL_ID = "lastChannelId"
         const val KEY_LAST_SURVEY_ID = "lastChannelId"
         private const val msgCounterTreeType = "msgCounter"
-        private const val userMsgCounterTreeType = "userMsgCounter"
+        private const val userActivityCounterTreeType = "userMsgCounter"
         private const val surveyTreeType = "surveyTreeType"
         fun combineArgsToString(vararg values: Any?): String =
                 values.joinToString(separator = ",") { it?.toString() ?: "" }
@@ -131,7 +130,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
                                 .thenCompose { courseApp.addListener(bot.token, buildMostActiveUserCallback(channelName)) }
                     }
                 }
-        val messagesCallbacks = courseBotApi.treeGet(userMsgCounterTreeType, bot.name)
+        val messagesCallbacks = courseBotApi.treeGet(userActivityCounterTreeType, bot.name)
                 .thenCompose<Unit> { keys ->
                     keys.filter { key ->
                         MessageCounterTreeKey.buildFromString(key).botName == bot.name
@@ -164,9 +163,9 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
                     if (sender.isEmpty()) ImmediateFuture { Unit }
                     else {
                         val key = MostActiveUserTreeKey(bot.name, channelName, sender).build()
-                        courseBotApi.treeContains(userMsgCounterTreeType, bot.name, GenericKeyPair(0L, key))
+                        courseBotApi.treeContains(userActivityCounterTreeType, bot.name, GenericKeyPair(0L, key))
                                 .thenCompose {
-                                    courseBotApi.treeInsert(userMsgCounterTreeType, bot.name, GenericKeyPair(0L, key))
+                                    courseBotApi.treeInsert(userActivityCounterTreeType, bot.name, GenericKeyPair(0L, key))
                                 }
                                 .thenCompose {
                                     incCounterValue(key)
@@ -237,7 +236,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
 
     private fun cleanAllBotStatisticsOnChannel(channelName: String?): CompletableFuture<Unit> {
         return invalidateCounter(channelName, msgCounterTreeType, bot.name)
-                .thenCompose { invalidateCounter(channelName, userMsgCounterTreeType, bot.name) }
+                .thenCompose { invalidateCounter(channelName, userActivityCounterTreeType, bot.name) }
                 .thenCompose {
                     if (channelName == null) ImmediateFuture { }
                     else
@@ -268,13 +267,13 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
         val extractedChannelName =
                 when (treeType) {
                     msgCounterTreeType -> MessageCounterTreeKey.buildFromString(genericKey.getSecond()).channelName
-                    userMsgCounterTreeType -> MostActiveUserTreeKey.buildFromString(genericKey.getSecond()).channelName
+                    userActivityCounterTreeType -> MostActiveUserTreeKey.buildFromString(genericKey.getSecond()).channelName
                     else -> throw UnsupportedOperationException()
                 }
         val extractedBotName =
                 when (treeType) {
                     msgCounterTreeType -> MessageCounterTreeKey.buildFromString(genericKey.getSecond()).botName
-                    userMsgCounterTreeType -> MostActiveUserTreeKey.buildFromString(genericKey.getSecond()).botName
+                    userActivityCounterTreeType -> MostActiveUserTreeKey.buildFromString(genericKey.getSecond()).botName
                     else -> throw UnsupportedOperationException()
                 }
 
