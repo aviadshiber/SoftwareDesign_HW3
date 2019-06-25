@@ -8,14 +8,13 @@ import com.natpryce.hamkrest.present
 import il.ac.technion.cs.softwaredesign.*
 import il.ac.technion.cs.softwaredesign.messages.MediaType
 import il.ac.technion.cs.softwaredesign.messages.MessageFactory
-import il.ac.technion.cs.softwaredesign.storage.SecureStorageModule
 import io.mockk.mockk
 import io.mockk.verify
 import org.junit.jupiter.api.Test
 import java.time.Duration.ofSeconds
 
 class CourseBotStaffTest {
-    private val injector = Guice.createInjector(CourseAppModule(), CourseBotModule(), SecureStorageModule())
+    private val injector = Guice.createInjector(CourseAppModule(), CourseBotModule(), OurSecureStorageModule())
 
     init {
         injector.getInstance<CourseAppInitializer>().setup().join()

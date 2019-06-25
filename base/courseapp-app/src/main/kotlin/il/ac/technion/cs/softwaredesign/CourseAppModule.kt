@@ -4,5 +4,6 @@ import com.authzee.kotlinguice4.KotlinModule
 
 class CourseAppModule : KotlinModule() {
     override fun configure() {
+
     }
 }
