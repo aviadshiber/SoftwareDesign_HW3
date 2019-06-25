@@ -22,8 +22,6 @@ class CourseBotsImpl @Inject constructor(private val courseApp: CourseApp,
                                          private val messageFactory: MessageFactory
 ) : CourseBots {
 
-    init {
-    }
 
     private val channelTreeWrapper: TreeWrapper = TreeWrapper(courseBotApi, "channel_")
     private val botTreeWrapper: TreeWrapper = TreeWrapper(courseBotApi, "bot_")

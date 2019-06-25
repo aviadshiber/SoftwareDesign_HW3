@@ -301,7 +301,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
         if (regex == null && mediaType == null) throw IllegalArgumentException()
         val countCallback: ListenerCallback = buildBeginCountCallback(bot.name, channel, regex, mediaType)
         return beginCountCountersInit(bot.name, channel, regex, mediaType)
-                .thenCompose { courseApp.addListener(bot.token, countCallback) } //TODO: add listener to storage
+                .thenCompose { courseApp.addListener(bot.token, countCallback) }
     }
 
     /**
@@ -386,7 +386,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
         return validateBotInChannel(channel)
                 .thenCompose { generateSurveyId() }.thenCompose { id -> SurveyClient(id, bot.name, courseBotApi).createQuestion(question, channel) }
                 .thenCompose { survey -> survey.putAnswers(answers).thenApply { survey } }
-                .thenCompose { survey -> courseApp.addListener(bot.token, buildSurveyCallback(channel, survey)).thenApply { survey } } //TODO: save listener in storage
+                .thenCompose { survey -> courseApp.addListener(bot.token, buildSurveyCallback(channel, survey)).thenApply { survey } }
                 .thenCompose { survey -> messageFactory.create(MediaType.TEXT, question.toByteArray()).thenApply { Pair(survey, it) } }
                 .thenCompose { (survey, m) -> courseApp.channelSend(bot.token, channel, m).thenApply { survey.id } }
                 .thenCompose { surveyId ->
