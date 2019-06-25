@@ -65,7 +65,7 @@ class CourseBotStaffTest {
                             .thenCompose {
                                 bots.bot().thenCompose { bot ->
                                     bot.join("#channel")
-                                            .thenApply { bot.setCalculationTrigger("calculate") }
+                                            .thenCompose { bot.setCalculationTrigger("calculate") }
                                 }
                             }
                             .thenCompose { courseApp.login("matan", "s3kr3t") }
@@ -87,11 +87,15 @@ class CourseBotStaffTest {
                     courseApp.channelJoin(adminToken, "#channel")
                             .thenCompose {
                                 bots.bot()
-                                        .thenCompose { bot -> bot.join("#channel").thenApply { bot } }
+                                        .thenCompose { bot ->
+                                            bot.join("#channel").thenApply { bot }
+                                        }
                                         .thenCompose { bot -> bot.setTipTrigger("tip") }
                             }
                             .thenCompose { courseApp.login("matan", "s3kr3t") }
-                            .thenCompose { token -> courseApp.channelJoin(token, "#channel").thenApply { token } }
+                            .thenCompose { token ->
+                                courseApp.channelJoin(token, "#channel").thenApply { token }
+                            }
                             .thenCompose { token -> courseApp.channelSend(token, "#channel", messageFactory.create(MediaType.TEXT, "tip 10 gal".toByteArray()).join()) }
                 }.join()
 
