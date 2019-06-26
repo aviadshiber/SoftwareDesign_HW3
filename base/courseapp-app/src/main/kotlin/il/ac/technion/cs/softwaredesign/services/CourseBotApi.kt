@@ -77,7 +77,7 @@ class CourseBotApi @javax.inject.Inject constructor(private val db: Database) {
      * @param token String
      * @return CompletableFuture<BotModel?>
      */
-    fun createBot(name: String, token: String, id: Long): CompletableFuture<BotModel?> {
+    fun createBot(id: Long, name: String, token: String): CompletableFuture<BotModel?> {
         return db.document(BotModel.TYPE)
                 .create(name)
                 .set(BotModel.KEY_BOT_ID, id)
@@ -85,6 +85,9 @@ class CourseBotApi @javax.inject.Inject constructor(private val db: Database) {
                 .set(BotModel.KEY_BOT_TOKEN, token)
                 .set(BotModel.KEY_BOT_LAST_SEEN_MSG_TIME, "")
                 .set(BotModel.KEY_BOT_CALCULATION_TRIGGER, "")
+                .set(BotModel.KEY_BOT_TIP_TRIGGER, "")
+                .set(BotModel.KEY_BOT_MOST_ACTIVE_USER, "")
+                .set(BotModel.KEY_BOT_MOST_ACTIVE_USER_COUNT, -1L)
                 .executeFor(BotModel::class.java)
     }
 
