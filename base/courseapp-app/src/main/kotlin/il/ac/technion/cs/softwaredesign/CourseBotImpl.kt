@@ -333,7 +333,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
         }
     }
 
-    private fun calculationTriggerRegex(trigger: String?) = """$trigger ([()\d*+-/]+)"""".toRegex()
+    private fun calculationTriggerRegex(trigger: String?) = """$trigger ([()\s\d*+-/]+)"""".toRegex()
 
     private fun setCallBackForTrigger(prop: KMutableProperty1<Bot, String?>, trigger: String?, r: Regex,
                                       action: (source: String, message: Message) -> CompletableFuture<Unit>)
