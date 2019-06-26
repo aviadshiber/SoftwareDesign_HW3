@@ -8,6 +8,8 @@ import com.natpryce.hamkrest.present
 import il.ac.technion.cs.softwaredesign.*
 import il.ac.technion.cs.softwaredesign.messages.MediaType
 import il.ac.technion.cs.softwaredesign.messages.MessageFactory
+import io.github.vjames19.futures.jdk8.ImmediateFuture
+import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import org.junit.jupiter.api.Test
@@ -32,6 +34,7 @@ class CourseBotStaffTest {
     @Test
     fun `A user in the channel can ask the bot to do calculation- checking parentheses precedence`() {
         val listener = mockk<ListenerCallback>(relaxed = true)
+        every { listener(any(), any()) } returns ImmediateFuture {  }
 
         courseApp.login("gal", "hunter2")
                 .thenCompose { adminToken ->
@@ -50,13 +53,14 @@ class CourseBotStaffTest {
 
         verify {
             listener.invoke("#channel@matan", any())
-            listener.invoke("#channel@Anna0", match { it.contents.toString().toInt() == 21 })
+            listener.invoke("#channel@Anna0", match { String(it.contents).toInt() == (20 * (2 + 2)/2)+1 })
         }
     }
 
     @Test
     fun `A user in the channel can ask the bot to do calculation- checking arithmetic precedence`() {
         val listener = mockk<ListenerCallback>(relaxed = true)
+        every { listener(any(), any()) } returns ImmediateFuture {  }
 
         courseApp.login("gal", "hunter2")
                 .thenCompose { adminToken ->
@@ -75,7 +79,7 @@ class CourseBotStaffTest {
 
         verify {
             listener.invoke("#channel@matan", any())
-            listener.invoke("#channel@Anna0", match { it.contents.toString().toInt() == ((20 * 1) + ((2 * 2) / 2) + 1) })
+            listener.invoke("#channel@Anna0", match { String(it.contents).toInt() == ((20 * 1) + ((2 * 2) / 2) + 1) })
         }
     }
 
@@ -108,6 +112,7 @@ class CourseBotStaffTest {
     @Test
     fun `A user in the channel can ask the bot to do calculation`() {
         val listener = mockk<ListenerCallback>(relaxed = true)
+        every { listener(any(), any()) } returns ImmediateFuture {  }
 
         courseApp.login("gal", "hunter2")
                 .thenCompose { adminToken ->
@@ -126,7 +131,7 @@ class CourseBotStaffTest {
 
         verify {
             listener.invoke("#channel@matan", any())
-            listener.invoke("#channel@Anna0", match { it.contents.toString().toInt() == 42 })
+            listener.invoke("#channel@Anna0", match { String(it.contents).toInt() == 42 })
         }
     }
 

@@ -70,9 +70,11 @@ class CourseBotsImpl @Inject constructor(private val courseApp: CourseApp,
             if (name == null) Pair(it, "$botDefaultName$it") else Pair(it, name)
 
     private fun loginBotIfNotExistFuture(botName: String, id: Long): CompletableFuture<Triple<String, Long, String>>? =
-            courseApp.login(botName, "").recoverWith { e ->
-                if (e !is UserAlreadyLoggedInException) throw e
-                else courseBotApi.findBot(botName).thenApply { bot -> bot!!.botToken }
+            courseApp.login(botName, "somepassword").exceptionally { e ->
+                if (e.cause is UserAlreadyLoggedInException) {
+                    courseBotApi.findBot(botName).thenApply { bot -> bot!!.botToken }.join()
+                }
+                else throw e
             } .thenApply { token: String -> Triple(token, id, botName) }
 
     private fun generateBotId(): CompletableFuture<Long> {

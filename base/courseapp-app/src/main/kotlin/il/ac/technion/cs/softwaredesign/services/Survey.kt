@@ -72,7 +72,7 @@ class SurveyClient constructor(surveyId: Long, private val botName: String, priv
 
     fun getAnswers(): CompletableFuture<List<Answer>> {
         return answersTree.treeToSequence(SurveyModel.LIST_ANSWERS, id).thenApply {
-            it.map { (genKey, _) -> genKey.getSecond() }.toList()
+            it.map { (genKey, _) -> genKey.getSecond() }.toList().reversed()
         }
     }
 

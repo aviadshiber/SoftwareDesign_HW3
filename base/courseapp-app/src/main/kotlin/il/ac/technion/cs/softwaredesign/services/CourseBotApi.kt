@@ -92,7 +92,7 @@ class CourseBotApi @javax.inject.Inject constructor(private val db: Database) {
     }
 
     fun updateBot(name: String, vararg pairs: Pair<String, Any>): CompletableFuture<BotModel?> {
-        return db.document(User.TYPE)
+        return db.document(BotModel.TYPE)
                 .update(name)
                 .set(*pairs)
                 .executeFor(BotModel::class.java)

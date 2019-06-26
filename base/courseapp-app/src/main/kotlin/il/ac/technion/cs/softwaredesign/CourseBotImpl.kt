@@ -181,6 +181,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
                     }
                 }
             }
+            // TODO: should we add something here?
         }
     }
 
@@ -191,6 +192,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
             ImmediateFuture {
                 if (isChannelNameValid(source) && source.channelName == channelName && isNewMessageByCreationTime(message))
                     bot.lastSeenMessageTime = message.created
+                Unit
             }
         }
     }
@@ -200,7 +202,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
             isValidRegistration(botName, source, channelName).thenCompose {
                 if (!it || !shouldBeCountMessage(regex, mediaType, source, message)) ImmediateFuture { }
                 else {
-                    val channelRegexMediaCounter = MessageCounterTreeKey(botName, source.channelName, regex, mediaType).build()
+                    val channelRegexMediaCounter = MessageCounterTreeKey(botName, channelName, regex, mediaType).build()
                     incCounterValue(channelRegexMediaCounter).thenDispose()
                 }
             }
@@ -217,7 +219,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
 
     private fun isValidRegistration(botName: String, source: String, channelName: String?): CompletableFuture<Boolean> {
         val sourceChannelName = source.channelName
-        if (!isChannelNameValid(sourceChannelName) || (channelName != null && sourceChannelName != channelName)) return ImmediateFuture { false }
+        if (!isChannelNameValid(source) || (channelName != null && sourceChannelName != channelName)) return ImmediateFuture { false }
         return courseBotApi.findChannel(sourceChannelName).thenApply { it!!.channelId }
                 .thenCompose { channelId -> botTreeWrapper.treeContains(BotModel.LIST_BOT_CHANNELS, botName, GenericKeyPair(channelId, sourceChannelName)) }
     }
@@ -299,9 +301,10 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
     // TODO: fix according documentation
     override fun beginCount(channel: String?, regex: String?, mediaType: MediaType?): CompletableFuture<Unit> {
         if (regex == null && mediaType == null) throw IllegalArgumentException()
-        val countCallback: ListenerCallback = buildBeginCountCallback(bot.name, channel, regex, mediaType)
+//        val countCallback: ListenerCallback = buildBeginCountCallback(bot.name, channel, regex, mediaType)
         return beginCountCountersInit(bot.name, channel, regex, mediaType)
-                .thenCompose { courseApp.addListener(bot.token, countCallback) }
+                .thenApply { buildBeginCountCallback(bot.name, channel, regex, mediaType) }
+                .thenCompose { countCallback->courseApp.addListener(bot.token, countCallback) }
     }
 
     /**
@@ -321,19 +324,18 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
 
     }
 
-
     override fun setCalculationTrigger(trigger: String?): CompletableFuture<String?> {
         val regex = calculationTriggerRegex(trigger)
         return setCallBackForTrigger(Bot::calculationTrigger, trigger, regex) { source: String, message: Message ->
             val content = String(message.contents)
             val (expression) = regex.find(content)!!.destructured
-            val solution = Value(expression).resolve()
-            val messageFuture = messageFactory.create(MediaType.TEXT, "$solution".toByteArray())
+            val solution = Value(expression).resolve().toInt()
+            val messageFuture = messageFactory.create(MediaType.TEXT, "$solution".toByteArray(Charsets.UTF_8))
             messageFuture.thenCompose { courseApp.channelSend(bot.token, source.channelName, it) }
         }
     }
 
-    private fun calculationTriggerRegex(trigger: String?) = """$trigger ([()\s\d*+-/]+)"""".toRegex()
+    private fun calculationTriggerRegex(trigger: String?) = "$trigger ([()\\s\\d*+-/]+)".toRegex()
 
     private fun setCallBackForTrigger(prop: KMutableProperty1<Bot, String?>, trigger: String?, r: Regex,
                                       action: (source: String, message: Message) -> CompletableFuture<Unit>)
