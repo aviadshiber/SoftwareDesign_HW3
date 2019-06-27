@@ -99,7 +99,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
     private fun removeBotFromChannel(channelName: String) =
             channelTreeWrapper.treeRemove(Channel.LIST_BOTS, channelName, GenericKeyPair(bot.id, bot.name))
 
-    fun getChannelNames() = botTreeWrapper.treeGet(BotModel.LIST_BOT_CHANNELS, bot.name)
+    private fun getChannelNames() = botTreeWrapper.treeGet(BotModel.LIST_BOT_CHANNELS, bot.name)
 
     private fun addChannelToBot(channelName: String, channelId: Long) =
             botTreeWrapper.treeInsert(BotModel.LIST_BOT_CHANNELS, bot.name, GenericKeyPair(channelId, channelName))
@@ -335,7 +335,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
         }
     }
 
-    private fun calculationTriggerRegex(trigger: String?) = "$trigger ([()\\s\\d*+-/]+)".toRegex()
+    private fun calculationTriggerRegex(trigger: String?) = """$trigger ([()\s\d*+-/]+)""".toRegex()
 
     private fun setCallBackForTrigger(prop: KMutableProperty1<Bot, String?>, trigger: String?, r: Regex,
                                       action: (source: String, message: Message) -> CompletableFuture<Unit>)

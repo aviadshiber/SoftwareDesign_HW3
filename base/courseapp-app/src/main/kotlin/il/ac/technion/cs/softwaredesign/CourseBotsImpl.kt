@@ -10,7 +10,6 @@ import il.ac.technion.cs.softwaredesign.services.Bot
 import il.ac.technion.cs.softwaredesign.services.CourseBotApi
 import il.ac.technion.cs.softwaredesign.trees.TreeWrapper
 import io.github.vjames19.futures.jdk8.ImmediateFuture
-import io.github.vjames19.futures.jdk8.recoverWith
 import java.util.concurrent.CompletableFuture
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -70,7 +69,7 @@ class CourseBotsImpl @Inject constructor(private val courseApp: CourseApp,
             if (name == null) Pair(it, "$botDefaultName$it") else Pair(it, name)
 
     private fun loginBotIfNotExistFuture(botName: String, id: Long): CompletableFuture<Triple<String, Long, String>>? =
-            courseApp.login(botName, "somepassword").exceptionally { e ->
+            courseApp.login(botName, "pwd").exceptionally { e ->
                 if (e.cause is UserAlreadyLoggedInException) {
                     courseBotApi.findBot(botName).thenApply { bot -> bot!!.botToken }.join()
                 }

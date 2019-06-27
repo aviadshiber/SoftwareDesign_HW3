@@ -83,6 +83,34 @@ class CourseBotStaffTest {
         }
     }
 
+
+    @Test
+    fun `A user in the channel can ask the bot to do calculation with bad regex pattern`() {
+        val listener = mockk<ListenerCallback>(relaxed = true)
+        every { listener(any(), any()) } returns ImmediateFuture { }
+
+        courseApp.login("gal", "hunter2")
+                .thenCompose { adminToken ->
+                    courseApp.channelJoin(adminToken, "#channel")
+                            .thenCompose {
+                                bots.bot().thenCompose { bot ->
+                                    bot.join("#channel")
+                                            .thenApply { bot.setCalculationTrigger("calculate") }
+                                }
+                            }
+                            .thenCompose { courseApp.login("matan", "s3kr3t") }
+                            .thenCompose { token -> courseApp.channelJoin(token, "#channel").thenApply { token } }
+                            .thenCompose { token -> courseApp.addListener(token, listener).thenApply { token } }
+                            .thenCompose { token -> courseApp.channelSend(token, "#channel", messageFactory.create(MediaType.TEXT, "calculate [20 * 1+2 * 2/2+1]".toByteArray()).join()) }
+                }.join()
+
+        verify {
+            listener.invoke("#channel@matan", any())
+
+        }
+        verify(exactly = 0) { listener.invoke("#channel@Anna0", any()) }
+    }
+
     @Test
     fun `Can create a bot and add make it join channels`() {
         val token = courseApp.login("gal", "hunter2").join()
