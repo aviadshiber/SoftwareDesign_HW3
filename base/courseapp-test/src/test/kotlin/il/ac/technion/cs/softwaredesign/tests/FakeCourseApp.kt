@@ -64,7 +64,7 @@ class FakeCourseApp @Inject constructor(
 
             userNameToToken[username] = username
             tokenToUserName[username] = username
-            Logger.getGlobal().fine { "tokenToUserName[%s] = %s".format(username, username) }
+            logger.fine { "tokenToUserName[%s] = %s".format(username, username) }
             userNameToListeners[username] = mutableListOf()
             userNameToPendingSourceMessages[username] = mutableListOf()
 
@@ -88,10 +88,10 @@ class FakeCourseApp @Inject constructor(
      * administrator.
      */
     override fun channelJoin(token: String, channel: String): CompletableFuture<Unit> {
-        logger.fine { "channelJoin(%s,%s)".format(token, channel) }
+        logger.info { "channelJoin(%s,%s)".format(token, channel) }
 
         return ImmediateFuture {
-            Logger.getGlobal().fine { "tokenToUserName[token]=%s".format(tokenToUserName[token]) }
+            logger.info { "tokenToUserName[token]=%s".format(tokenToUserName[token]) }
             val username = tokenToUserName[token] ?: throw InvalidTokenException()
 
             if (!"""#[0-9A-Za-z_#]*""".toRegex().matches(channel)) {
@@ -327,7 +327,19 @@ class FakeCourseApp @Inject constructor(
     }
 
     override fun channelKick(token: String, channel: String, username: String): CompletableFuture<Unit> {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+        //TODO: implement for tests
+        logger.info { "channelKick(%s,%s)".format(token, channel) }
+
+        return ImmediateFuture {
+            logger.info { "tokenToUserName[token]=%s".format(tokenToUserName[token]) }
+            val username = tokenToUserName[token] ?: throw InvalidTokenException()
+
+            if (!"""#[0-9A-Za-z_#]*""".toRegex().matches(channel)) {
+                throw NameFormatException()
+            }
+
+            channelsUsers[channel]?.remove(username)
+        }.thenDispose()
     }
 
     override fun numberOfActiveUsersInChannel(token: String, channel: String): CompletableFuture<Long> {

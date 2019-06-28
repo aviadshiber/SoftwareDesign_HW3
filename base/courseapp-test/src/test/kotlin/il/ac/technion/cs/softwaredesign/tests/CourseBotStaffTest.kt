@@ -2,10 +2,12 @@ package il.ac.technion.cs.softwaredesign.tests
 
 import com.authzee.kotlinguice4.getInstance
 import com.google.inject.Guice
+import com.natpryce.hamkrest.absent
 import com.natpryce.hamkrest.assertion.assertThat
 import com.natpryce.hamkrest.equalTo
 import com.natpryce.hamkrest.present
 import il.ac.technion.cs.softwaredesign.*
+import il.ac.technion.cs.softwaredesign.exceptions.UserNotAuthorizedException
 import il.ac.technion.cs.softwaredesign.messages.MediaType
 import il.ac.technion.cs.softwaredesign.messages.MessageFactory
 import io.github.vjames19.futures.jdk8.ImmediateFuture
@@ -13,7 +15,9 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import java.time.Duration.ofSeconds
+import java.util.concurrent.CompletableFuture
 
 class CourseBotStaffTest {
     private val injector = Guice.createInjector(CourseAppModule(), CourseBotModule(), TestModule())
@@ -32,9 +36,91 @@ class CourseBotStaffTest {
     }
 
     @Test
+    fun `bot cannot join to a channel that does not exist`() {
+        courseApp.login("aviad", "hunter2").thenCompose { adminToken -> courseApp.channelJoin(adminToken, "#channel").thenApply { adminToken } }.join()
+        val bot = bots.bot().thenCompose { bot -> bot.join("#channel").thenApply { bot } }.join()
+
+        assertThrows<UserNotAuthorizedException> {
+            runWithTimeout(ofSeconds(10)) {
+                bot.join("#notExistingChannel").joinException()
+                bot.join("notExistingChannel").joinException()
+            }
+        }
+    }
+
+    /*@Test
+    fun `bot cannot do action on a a channel after he was kicked`(){
+        val channelName="#channel"
+        val adminToken=courseApp.login("aviad", "hunter2").thenCompose { adminToken -> courseApp.channelJoin(adminToken, channelName).thenApply { adminToken } }.join()
+        val bot=bots.bot("mybot").thenCompose { bot -> bot.join(channelName).thenApply { bot }}.join()
+        courseApp.channelKick(adminToken,channelName,"mybot")
+        assertThrows<UserNotAuthorizedException>{
+            runWithTimeout(ofSeconds(10)) {
+                bot.mostActiveUser(channelName).joinException()
+                bot.richestUser(channelName).joinException()
+                bot.beginCount(channelName,"",null).joinException()
+                bot.count(channelName,"",null).joinException()
+                bot.runSurvey(channelName,"what?!", listOf()).joinException()
+            }
+        }
+    }*/
+
+    @Test
+    fun `bot cash tracks get reset after bot leave channel`() {
+        courseApp.login("aviad", "hunter2").thenCompose { adminToken -> courseApp.channelJoin(adminToken, "#channel").thenApply { adminToken } }.join()
+        val bot = bots.bot().thenCompose { bot -> bot.join("#channel").thenApply { bot }.thenCompose { bot.setTipTrigger("tip") }.thenApply { bot } }.join()
+        courseApp.login("shahar", "pass").thenCompose { token -> joinChannelAndSendAsUser("#channel", "tip 1000 aviad", token) }.join()
+        courseApp.login("ron", "pass").thenCompose { token -> joinChannelAndSendAsUser("#channel", "tip 500 shahar", token) }.join()
+        assertThat(runWithTimeout(ofSeconds(10)) {
+            bot.richestUser("#channel").get()
+        }, equalTo("aviad"))
+
+        reconnectBotInChannel(bot, "#channel").join()
+        val newRichest: String? = bot.richestUser("#channel").get()
+        assertThat(newRichest, absent())
+
+    }
+
+    @Test
+    fun `bot tracks for richest user but both users have same amount of cash so no such user exist`() {
+        val adminToken = courseApp.login("aviad", "hunter2").thenCompose { adminToken -> courseApp.channelJoin(adminToken, "#channel").thenApply { adminToken } }.join()
+        val bot = bots.bot().thenCompose { bot -> bot.join("#channel").thenApply { bot }.thenCompose { bot.setTipTrigger("tip") }.thenApply { bot } }.join()
+        courseApp.login("shahar", "pass").thenCompose { token -> joinChannelAndSendAsUser("#channel", "tip 1000 aviad", token) }.join()
+        courseApp.login("ron", "pass").thenCompose { token -> joinChannelAndSendAsUser("#channel", "tip 1000 shahar", token) }.join()
+
+        val richest: String? = bot.richestUser("#channel").get()
+        assertThat(richest, absent())
+
+    }
+
+    private fun reconnectBotInChannel(bot: CourseBot, channel: String): CompletableFuture<Unit> {
+        return bot.part(channel).thenCompose { bot.join(channel) }
+    }
+
+    @Test
+    fun `bot start counting on channel, then we restore the bot and count the messages`() {
+        courseApp.login("aviad", "hunter2")
+                .thenCompose { adminToken -> courseApp.channelJoin(adminToken, "#channel").thenApply { adminToken } }.join()
+
+        bots.bot()
+                .thenCompose { bot ->
+                    bot.join("#channel").thenApply { bot }.thenCompose { bot.beginCount("#channel", "hello", MediaType.TEXT) }
+                }
+                .thenCompose { courseApp.login("shahar", "pass").thenCompose { token -> joinChannelAndSendAsUser("#channel", "hello", token) } }.join()
+
+
+
+        assertThat(runWithTimeout(ofSeconds(10)) {
+            bots.bot("Anna0").thenCompose { bot -> bot.count("#channel", "hello", MediaType.TEXT) }.get()
+        }, equalTo(1L))
+
+
+    }
+
+    @Test
     fun `A user in the channel can ask the bot to do calculation- checking parentheses precedence`() {
         val listener = mockk<ListenerCallback>(relaxed = true)
-        every { listener(any(), any()) } returns ImmediateFuture {  }
+        every { listener(any(), any()) } returns ImmediateFuture { }
 
         courseApp.login("gal", "hunter2")
                 .thenCompose { adminToken ->
@@ -42,7 +128,7 @@ class CourseBotStaffTest {
                             .thenCompose {
                                 bots.bot().thenCompose { bot ->
                                     bot.join("#channel")
-                                            .thenApply { bot.setCalculationTrigger("calculate") }
+                                            .thenCompose { bot.setCalculationTrigger("calculate") }
                                 }
                             }
                             .thenCompose { courseApp.login("matan", "s3kr3t") }
@@ -53,14 +139,14 @@ class CourseBotStaffTest {
 
         verify {
             listener.invoke("#channel@matan", any())
-            listener.invoke("#channel@Anna0", match { String(it.contents).toInt() == (20 * (2 + 2)/2)+1 })
+            listener.invoke("#channel@Anna0", match { String(it.contents).toInt() == (20 * (2 + 2) / 2) + 1 })
         }
     }
 
     @Test
     fun `A user in the channel can ask the bot to do calculation- checking arithmetic precedence`() {
         val listener = mockk<ListenerCallback>(relaxed = true)
-        every { listener(any(), any()) } returns ImmediateFuture {  }
+        every { listener(any(), any()) } returns ImmediateFuture { }
 
         courseApp.login("gal", "hunter2")
                 .thenCompose { adminToken ->
@@ -68,7 +154,7 @@ class CourseBotStaffTest {
                             .thenCompose {
                                 bots.bot().thenCompose { bot ->
                                     bot.join("#channel")
-                                            .thenApply { bot.setCalculationTrigger("calculate") }
+                                            .thenCompose { bot.setCalculationTrigger("calculate") }
                                 }
                             }
                             .thenCompose { courseApp.login("matan", "s3kr3t") }
@@ -95,7 +181,7 @@ class CourseBotStaffTest {
                             .thenCompose {
                                 bots.bot().thenCompose { bot ->
                                     bot.join("#channel")
-                                            .thenApply { bot.setCalculationTrigger("calculate") }
+                                            .thenCompose { bot.setCalculationTrigger("calculate") }
                                 }
                             }
                             .thenCompose { courseApp.login("matan", "s3kr3t") }
@@ -140,7 +226,7 @@ class CourseBotStaffTest {
     @Test
     fun `A user in the channel can ask the bot to do calculation`() {
         val listener = mockk<ListenerCallback>(relaxed = true)
-        every { listener(any(), any()) } returns ImmediateFuture {  }
+        every { listener(any(), any()) } returns ImmediateFuture { }
 
         courseApp.login("gal", "hunter2")
                 .thenCompose { adminToken ->
@@ -189,6 +275,10 @@ class CourseBotStaffTest {
         }, present(equalTo("gal")))
     }
 
+    fun joinChannelAndSendAsUser(channel: String, content: String, userToken: String): CompletableFuture<Unit> {
+        return courseApp.channelJoin(userToken, channel).thenCompose { courseApp.channelSend(userToken, channel, messageFactory.create(MediaType.TEXT, content.toByteArray()).get()) }
+    }
+
     @Test
     fun `The bot accurately tracks keywords`() {
         val regex = ".*ello.*[wW]orl.*"
@@ -201,9 +291,7 @@ class CourseBotStaffTest {
                                         .thenCompose { bot -> bot.join(channel).thenApply { bot } }
                                         .thenCompose { bot -> bot.beginCount(regex = regex) }
                             }
-                            .thenCompose { courseApp.login("matan", "s3kr3t") }
-                            .thenCompose { token -> courseApp.channelJoin(token, channel).thenApply { token } }
-                            .thenCompose { token -> courseApp.channelSend(token, channel, messageFactory.create(MediaType.TEXT, "hello, world!".toByteArray()).join()) }
+                            .thenCompose { courseApp.login("matan", "pass").thenCompose { token -> joinChannelAndSendAsUser(channel, "hello, world!", token) } }
                 }.join()
 
         assertThat(runWithTimeout(ofSeconds(10)) {
