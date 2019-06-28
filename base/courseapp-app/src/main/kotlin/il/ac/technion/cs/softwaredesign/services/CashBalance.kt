@@ -13,6 +13,12 @@ class CashBalance constructor(private val channelName: String, private val botNa
     // type = channelName, name = botName, keys: genericKey(0L, username), values: money
     private val userMoneyTreeWrapper = TreeWrapper(courseBotApi, "userMoney__")
 
+    fun cleanData(): CompletableFuture<CashBalance> {
+        return cashTreeWrapper.treeClean(channelName, botName)
+                .thenCompose { userMoneyTreeWrapper.treeClean(channelName, botName) }
+                .thenApply { this }
+    }
+
     /**
      * Note: this function assumes src & dest users exists in courseApp
      * transfer [money] from [srcUser] to [destUser] or do nothing if [srcUser] has less than [money]

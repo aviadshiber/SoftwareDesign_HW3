@@ -236,18 +236,17 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
                 .thenCompose { courseApp.removeListener(bot.token, buildMostActiveUserCallback(channelName)) }
     }
 
-    private fun cleanAllBotStatisticsOnChannel(channelName: String?): CompletableFuture<Unit> {
+    private fun cleanAllBotStatisticsOnChannel(channelName: String): CompletableFuture<Unit> {
         return invalidateCounter(channelName, msgCounterTreeType, bot.name)
                 .thenCompose { invalidateCounter(channelName, userActivityCounterTreeType, bot.name) }
+                .thenCompose { CashBalance(channelName, bot.name, courseBotApi).cleanData() }
                 .thenCompose {
-                    if (channelName == null) ImmediateFuture { }
-                    else
-                        courseBotApi.treeGet(surveyTreeType, bot.name)
-                                .thenCompose {
-                                    it.mapComposeList { sid ->
-                                        SurveyClient.initializeSurveyStatisticsInChannel(sid.toLong(), bot.name, channelName, courseBotApi)
-                                    }
+                    courseBotApi.treeGet(surveyTreeType, bot.name)
+                            .thenCompose {
+                                it.mapComposeList { sid ->
+                                    SurveyClient.initializeSurveyStatisticsInChannel(sid.toLong(), bot.name, channelName, courseBotApi)
                                 }
+                            }
                     // .thenCompose { courseBotApi.treeClean(surveyTreeType, bot.name) } //we should never delete the surveys even when bot leave a channel
                 }
     }
@@ -304,7 +303,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
 //        val countCallback: ListenerCallback = buildBeginCountCallback(bot.name, channel, regex, mediaType)
         return beginCountCountersInit(bot.name, channel, regex, mediaType)
                 .thenApply { buildBeginCountCallback(bot.name, channel, regex, mediaType) }
-                .thenCompose { countCallback->courseApp.addListener(bot.token, countCallback) }
+                .thenCompose { countCallback -> courseApp.addListener(bot.token, countCallback) }
     }
 
     /**
