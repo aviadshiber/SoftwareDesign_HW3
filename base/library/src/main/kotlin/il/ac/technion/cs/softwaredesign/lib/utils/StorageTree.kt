@@ -4,6 +4,7 @@ import com.google.gson.reflect.TypeToken
 import il.ac.technion.cs.softwaredesign.lib.db.dal.GsonInstance
 import il.ac.technion.cs.softwaredesign.lib.utils.StorageTree.StorageNode.Companion.deserialize
 import il.ac.technion.cs.softwaredesign.storage.SecureStorage
+import io.github.vjames19.futures.jdk8.ImmediateFuture
 import java.io.Serializable
 import java.nio.ByteBuffer
 import java.util.*
@@ -577,7 +578,7 @@ open class StorageTree<K: Comparable<K>, V>(private val storage: CompletableFutu
     }
 
     fun leftmost(): CompletableFuture<Pair<K, V>?> {
-        return root.thenCompose { r -> r?.leftmost() }
+        return root.thenCompose<StorageNode<K,V>?> { r -> if (r==null) ImmediateFuture { null } else r.leftmost() }
                 .thenApply { node: StorageNode<K,V>? -> if(node==null) null else Pair(node.key, node.value) }
     }
 

@@ -67,10 +67,18 @@ class CourseBotStaffTest {
 
     @Test
     fun `bot cash tracks get reset after bot leave channel`() {
-        courseApp.login("aviad", "hunter2").thenCompose { adminToken -> courseApp.channelJoin(adminToken, "#channel").thenApply { adminToken } }.join()
-        val bot = bots.bot().thenCompose { bot -> bot.join("#channel").thenApply { bot }.thenCompose { bot.setTipTrigger("tip") }.thenApply { bot } }.join()
-        courseApp.login("shahar", "pass").thenCompose { token -> joinChannelAndSendAsUser("#channel", "tip 1000 aviad", token) }.join()
-        courseApp.login("ron", "pass").thenCompose { token -> joinChannelAndSendAsUser("#channel", "tip 500 shahar", token) }.join()
+        courseApp.login("aviad", "hunter2")
+                .thenCompose { adminToken -> courseApp.channelJoin(adminToken, "#channel").thenApply { adminToken } }
+                .join()
+        val bot = bots.bot()
+                .thenCompose { bot -> bot.join("#channel").thenApply { bot }}
+                .thenCompose { bot->bot.setTipTrigger("tip").thenApply { bot }}.join()
+        courseApp.login("shahar", "pass")
+                .thenCompose { token -> joinChannelAndSendAsUser("#channel", "tip 1000 aviad", token) }
+                .join()
+        courseApp.login("ron", "pass")
+                .thenCompose { token -> joinChannelAndSendAsUser("#channel", "tip 500 shahar", token) }
+                .join()
         assertThat(runWithTimeout(ofSeconds(10)) {
             bot.richestUser("#channel").get()
         }, equalTo("aviad"))
@@ -78,19 +86,25 @@ class CourseBotStaffTest {
         reconnectBotInChannel(bot, "#channel").join()
         val newRichest: String? = bot.richestUser("#channel").get()
         assertThat(newRichest, absent())
-
     }
 
     @Test
     fun `bot tracks for richest user but both users have same amount of cash so no such user exist`() {
-        val adminToken = courseApp.login("aviad", "hunter2").thenCompose { adminToken -> courseApp.channelJoin(adminToken, "#channel").thenApply { adminToken } }.join()
-        val bot = bots.bot().thenCompose { bot -> bot.join("#channel").thenApply { bot }.thenCompose { bot.setTipTrigger("tip") }.thenApply { bot } }.join()
-        courseApp.login("shahar", "pass").thenCompose { token -> joinChannelAndSendAsUser("#channel", "tip 1000 aviad", token) }.join()
-        courseApp.login("ron", "pass").thenCompose { token -> joinChannelAndSendAsUser("#channel", "tip 1000 shahar", token) }.join()
-
+        val adminToken = courseApp.login("aviad", "hunter2")
+                .thenCompose { adminToken -> courseApp.channelJoin(adminToken, "#channel").thenApply { adminToken } }
+                .join()
+        val bot = bots.bot()
+                .thenCompose { bot -> bot.join("#channel").thenApply { bot }}
+                .thenCompose { bot->bot.setTipTrigger("tip").thenApply { bot }}.join()
+        courseApp.login("shahar", "pass")
+                .thenCompose { token -> joinChannelAndSendAsUser("#channel", "tip 1000 aviad", token) }.join()
+        courseApp.login("ron", "pass")
+                .thenCompose { token -> joinChannelAndSendAsUser("#channel", "tip 1000 shahar", token) }.join()
+        courseApp.login("gal", "pass")
+                .thenCompose { token -> joinChannelAndSendAsUser("#channel", "tip 1000 shahar", token) }.join()
         val richest: String? = bot.richestUser("#channel").get()
-        assertThat(richest, absent())
 
+        assertThat(richest, absent())
     }
 
     private fun reconnectBotInChannel(bot: CourseBot, channel: String): CompletableFuture<Unit> {
@@ -276,7 +290,9 @@ class CourseBotStaffTest {
     }
 
     fun joinChannelAndSendAsUser(channel: String, content: String, userToken: String): CompletableFuture<Unit> {
-        return courseApp.channelJoin(userToken, channel).thenCompose { courseApp.channelSend(userToken, channel, messageFactory.create(MediaType.TEXT, content.toByteArray()).get()) }
+        return courseApp.channelJoin(userToken, channel)
+                .thenCompose { courseApp.channelSend(userToken, channel,
+                        messageFactory.create(MediaType.TEXT, content.toByteArray()).get()) }
     }
 
     @Test
