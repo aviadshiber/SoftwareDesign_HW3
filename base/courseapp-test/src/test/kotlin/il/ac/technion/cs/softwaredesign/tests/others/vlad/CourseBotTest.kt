@@ -159,8 +159,7 @@ open class CourseBotTest : CourseTest() {
                     .thenCompose { bot.part(channel) }
                     .thenCompose { bot.join(channel) }
                     .join()
-
-            assertThrows<IllegalArgumentException> { bot.count(channel, regex).joinException() }
+            assertThat(bot.count(channel, regex).join(), present(equalTo(0L)))
         }
 
         @Test
