@@ -22,6 +22,7 @@ import il.ac.technion.cs.softwaredesign.utils.convertToLocalDateTime
 import il.ac.technion.cs.softwaredesign.utils.convertToString
 import io.github.vjames19.futures.jdk8.Future
 import io.github.vjames19.futures.jdk8.ImmediateFuture
+import io.github.vjames19.futures.jdk8.mapError
 import io.github.vjames19.futures.jdk8.recover
 import java.time.LocalDateTime
 import java.util.concurrent.CompletableFuture
@@ -227,7 +228,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
 
     override fun part(channelName: String): CompletableFuture<Unit> {
         return courseApp.channelPart(bot.token, channelName)
-                .exceptionally { throw NoSuchEntityException() }
+                .mapError { throw NoSuchEntityException() }
                 // channel must be exist at this point
                 .thenCompose { cleanAllBotStatisticsOnChannel(channelName) }
                 .thenCompose { getChannelId(channelName) }
