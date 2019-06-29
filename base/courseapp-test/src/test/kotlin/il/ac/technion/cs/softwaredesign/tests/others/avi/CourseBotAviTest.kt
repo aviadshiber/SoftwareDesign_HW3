@@ -12,14 +12,10 @@ import il.ac.technion.cs.softwaredesign.*
 import il.ac.technion.cs.softwaredesign.exceptions.NoSuchEntityException
 import il.ac.technion.cs.softwaredesign.exceptions.UserAlreadyLoggedInException
 import il.ac.technion.cs.softwaredesign.exceptions.UserNotAuthorizedException
-import il.ac.technion.cs.softwaredesign.messages.MediaType
-import il.ac.technion.cs.softwaredesign.messages.Message
-import il.ac.technion.cs.softwaredesign.messages.MessageFactory
+import il.ac.technion.cs.softwaredesign.messages.*
 import il.ac.technion.cs.softwaredesign.storage.SecureStorage
 import il.ac.technion.cs.softwaredesign.storage.SecureStorageFactory
-import il.ac.technion.cs.softwaredesign.tests.containsElementsInOrder
-import il.ac.technion.cs.softwaredesign.tests.joinException
-import il.ac.technion.cs.softwaredesign.tests.runWithTimeout
+import il.ac.technion.cs.softwaredesign.tests.*
 import io.mockk.*
 import org.junit.jupiter.api.Assertions.assertDoesNotThrow
 import org.junit.jupiter.api.Nested
@@ -31,7 +27,7 @@ import java.util.concurrent.CompletableFuture
 
 fun completedOf(): CompletableFuture<Unit> = CompletableFuture.completedFuture(Unit)
 inline fun <reified T> completedOf(t: T): CompletableFuture<T> = CompletableFuture.completedFuture(t)
-inline fun <reified T> failedOf(t: Throwable): CompletableFuture<T> = CompletableFuture.failedFuture(t)
+//inline fun <reified T> failedOf(t: Throwable): CompletableFuture<T> = CompletableFuture.failedFuture(t)
 
 class CourseBotTest {
     // We Inject a mocked KeyValueStore and not rely on a KeyValueStore that relies on another DB layer
@@ -68,16 +64,17 @@ class CourseBotTest {
 
         class CourseAppModuleMock : KotlinModule() {
             override fun configure() {
-                val keystoreinst = VolatileKeyValueStore()
-
-                bind<KeyValueStore>().toInstance(keystoreinst)
                 bind<CourseApp>().toInstance(app)
                 bind<CourseAppStatistics>().toInstance(statistics)
                 bind<MessageFactory>().toInstance(messageFactory)
 
                 bind<SecureStorage>().toInstance(MockStorage())
                 bind<SecureStorageFactory>().to<SecureStorageFactoryMock>()
-                bind<CourseBots>().to<CourseBotManager>()
+
+                bind<CourseAppInitializer>().to<FakeCourseAppInitializer>()
+                bind<MutableMap<String, String>>().to<LinkedHashMap<String, String>>()
+                bind<MutableSet<String>>().to<LinkedHashSet<String>>()
+                bind<CourseBots>().to<CourseBotsImpl>()
             }
         }
 
@@ -139,7 +136,7 @@ class CourseBotTest {
         fun `throws when can't join`() {
             every { app.login(any(), any()) } returns completedOf("1")
             every { app.addListener(any(), any()) } returns completedOf()
-            every { app.channelJoin(any(), any()) } returns failedOf(UserNotAuthorizedException())
+//            every { app.channelJoin(any(), any()) } returns failedOf(UserNotAuthorizedException())
 
             val bot = bots.bot().join()
 
@@ -150,7 +147,7 @@ class CourseBotTest {
         fun `throws when can't part`() {
             every { app.login(any(), any()) } returns completedOf("1")
             every { app.addListener(any(), any()) } returns completedOf()
-            every { app.channelPart(any(), any()) } returns failedOf(NoSuchEntityException())
+//            every { app.channelPart(any(), any()) } returns failedOf(NoSuchEntityException())
 
             val bot = bots.bot().join()
 
@@ -163,6 +160,7 @@ class CourseBotTest {
             every { app.addListener(any(), any()) } returns completedOf()
             every { app.channelJoin(any(), any()) } returns completedOf()
             every { app.channelPart(any(), any()) } returns completedOf()
+            every { app.removeListener(any(), any()) } returns completedOf()
 
             val bot = bots.bot().join()
             bot.join("#c").join()
@@ -627,15 +625,8 @@ class CourseBotStaffTest {
     init {
         class CourseAppModuleMock : KotlinModule() {
             override fun configure() {
-                val keystoreinst = VolatileKeyValueStore()
 
-                val managers = Managers(keystoreinst)
-                bind<Managers>().toInstance(managers)
-                bind<MessageFactory>().toInstance(managers.messages)
-
-                bind<KeyValueStore>().toInstance(keystoreinst)
-                bind<CourseApp>().to<CourseAppImpl>()
-                bind<CourseAppStatistics>().to<CourseAppStatisticsImpl>()
+                bind<CourseApp>().to<FakeCourseApp>()
 
 
                 // Bots
@@ -663,7 +654,6 @@ class CourseBotStaffTest {
                     }
                 }
                 bind<SecureStorageFactory>().to<SecureStorageFactoryMock>()
-                bind<CourseBots>().to<CourseBotManager>()
             }
         }
 
