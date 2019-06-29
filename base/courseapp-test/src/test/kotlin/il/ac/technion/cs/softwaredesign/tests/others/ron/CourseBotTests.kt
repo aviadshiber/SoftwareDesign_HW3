@@ -158,7 +158,7 @@ class CourseBotTests {
         val bot3 = bots.bot().join()
         bot3.join("#channel").join()
 
-        assertEquals(listOf("NotAnna", "Anna0", "Anna1"), bots.bots("#channel").join())
+        assertEquals(listOf("NotAnna", "Anna1", "Anna2"), bots.bots("#channel").join())
     }
 
     @Test
