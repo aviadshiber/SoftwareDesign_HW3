@@ -1,4 +1,4 @@
-package il.ac.technion.cs.softwaredesign.tests
+package il.ac.technion.cs.softwaredesign.tests.others.vlad
 
 import com.natpryce.hamkrest.absent
 import com.natpryce.hamkrest.assertion.assertThat
@@ -10,6 +10,9 @@ import il.ac.technion.cs.softwaredesign.exceptions.NoSuchEntityException
 import il.ac.technion.cs.softwaredesign.exceptions.UserNotAuthorizedException
 import il.ac.technion.cs.softwaredesign.messages.MediaType
 import il.ac.technion.cs.softwaredesign.messages.Message
+import il.ac.technion.cs.softwaredesign.tests.containsElementsInOrder
+import il.ac.technion.cs.softwaredesign.tests.joinException
+import il.ac.technion.cs.softwaredesign.tests.runWithTimeout
 import io.mockk.confirmVerified
 import io.mockk.every
 import io.mockk.mockk

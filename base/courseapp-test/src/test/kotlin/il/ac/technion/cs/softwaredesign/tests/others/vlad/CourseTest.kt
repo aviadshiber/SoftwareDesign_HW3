@@ -1,10 +1,12 @@
-package il.ac.technion.cs.softwaredesign.tests
+package il.ac.technion.cs.softwaredesign.tests.others.vlad
 
 import com.authzee.kotlinguice4.getInstance
 import com.google.inject.Guice
 import com.google.inject.Injector
 import il.ac.technion.cs.softwaredesign.*
 import il.ac.technion.cs.softwaredesign.messages.MessageFactory
+import il.ac.technion.cs.softwaredesign.tests.FakeCourseApp
+import il.ac.technion.cs.softwaredesign.tests.TestModule
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeAll
 import java.util.logging.FileHandler
@@ -12,7 +14,7 @@ import java.util.logging.Level
 import java.util.logging.Logger
 
 open class CourseTest {
-    protected val injector: Injector = Guice.createInjector(CourseAppModule(), CourseBotModule(), TestModule())
+    protected val injector: Injector = Guice.createInjector(CourseBotModule(), TestModule())
 
     init {
         injector.getInstance<CourseAppInitializer>().setup().join()
