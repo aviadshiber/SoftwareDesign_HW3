@@ -114,7 +114,7 @@ open class CourseBotTest : CourseTest() {
         }
 
         @Test
-        fun `IllegalArgumentException after parting from channel count`() {
+        fun `counter get reset after parting from channel count`() {
             val channel = "#hell"
             val regex = ".*"
 
@@ -126,11 +126,11 @@ open class CourseBotTest : CourseTest() {
                     .thenCompose { bot.part(channel) }
                     .join()
 
-            assertThrows<IllegalArgumentException> { bot.count(channel, regex).joinException() }
+            assertThat(bot.count(channel, regex).join(), present(equalTo(0L)))
         }
 
         @Test
-        fun `IllegalArgumentException after parting and joining from count`() {
+        fun `counter get reset after parting and joining from count`() {
             val channel = "#hell"
             val regex = ".*"
 
@@ -143,7 +143,7 @@ open class CourseBotTest : CourseTest() {
                     .thenCompose { bot.join(channel) }
                     .join()
 
-            assertThrows<IllegalArgumentException> { bot.count(channel, regex).joinException() }
+            assertThat(bot.count(channel, regex).join(), present(equalTo(0L)))
         }
 
         @Test
