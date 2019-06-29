@@ -482,7 +482,7 @@ class CourseBotStaffTest {
         val adminToken = courseApp.login("admin", "pass")
                 .thenCompose { token -> courseApp.channelJoin(token, channelName).thenApply { token } }
                 .join()
-        val regularUserToken = courseApp.login("ron", "123")
+        courseApp.login("ron", "123")
                 .thenCompose { token -> courseApp.channelJoin(token, channelName).thenApply { token } }
                 .join()
         val bot1 = bots.bot("bot1")
@@ -501,6 +501,36 @@ class CourseBotStaffTest {
         bot1.part(channelName).join()
         val seenTime3 = bot1.seenTime("admin").join()
         assertThat(m2.created, present(equalTo(seenTime3)))
+    }
+
+    @Test
+    fun `bot can track MostActiveUser`() {
+        val channelName = "#channel"
+        val adminToken = courseApp.login("admin", "pass")
+                .thenCompose { token -> courseApp.channelJoin(token, channelName).thenApply { token } }
+                .join()
+        val aviad = courseApp.login("aviad", "123")
+                .thenCompose { token -> courseApp.channelJoin(token, channelName).thenApply { token } }
+                .join()
+        val bot = bots.bot("bot1")
+                .thenCompose { bot -> bot.join(channelName).thenApply { bot } }
+                .join()
+        sendToChannel(adminToken, channelName, "message#1 from admin").join()
+        sendToChannel(adminToken, channelName, "message#2 from admin").join()
+        sendToChannel(aviad, channelName, "message#1 from aviad").join()
+        sendToChannel(adminToken, channelName, "message#3 from admin").join()
+        assertThat(runWithTimeout(ofSeconds(10)) {
+            bot.mostActiveUser(channelName).join()
+        }, present(equalTo("admin")))
+        sendToChannel(aviad, channelName, "message#2 from aviad").join()
+        sendToChannel(aviad, channelName, "message#3 from aviad").join()
+        assertThat(runWithTimeout(ofSeconds(10)) {
+            bot.mostActiveUser(channelName).join()
+        }, absent())
+        sendToChannel(aviad, channelName, "message#4 from aviad").join()
+        assertThat(runWithTimeout(ofSeconds(10)) {
+            bot.mostActiveUser(channelName).join()
+        }, present(equalTo("aviad")))
 
 
     }
