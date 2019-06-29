@@ -37,6 +37,28 @@ class CourseBotStaffTest {
     }
 
     @Test
+    fun `calc trigger return previous phase`() {
+        val listener = mockk<ListenerCallback>(relaxed = true)
+        every { listener(any(), any()) } returns ImmediateFuture { }
+
+        courseApp.login("aviad", "shiber").thenCompose { adminToken -> courseApp.channelJoin(adminToken, "#channel") }.join()
+        var lastTrigger = bots.bot().thenCompose { bot -> bot.join("#channel").thenCompose { bot.setCalculationTrigger("calculate") } }.join()
+        assertThat(lastTrigger, absent())
+        courseApp.login("matan", "s3kr3t")
+                .thenCompose { token -> courseApp.channelJoin(token, "#channel").thenApply { token } }
+                .thenCompose { token -> courseApp.addListener(token, listener).thenApply { token } }
+                .thenCompose { token -> courseApp.channelSend(token, "#channel", messageFactory.create(MediaType.TEXT, "calculate 2+ 20*3".toByteArray()).join()) }
+        lastTrigger = bots.bot("Anna0").thenCompose { bot -> bot.setCalculationTrigger("otherCalc") }.join()
+        assertThat(lastTrigger, present(equalTo("calculate")))
+        lastTrigger = bots.bot("Anna0").thenCompose { bot -> bot.setCalculationTrigger("otherCalc") }.join()
+        assertThat(lastTrigger, present(equalTo("otherCalc")))
+        verify {
+            listener.invoke("#channel@matan", any())
+            listener.invoke("#channel@Anna0", match { String(it.contents).toInt() == 2 + 20 * 3 })
+        }
+    }
+
+    @Test
     fun `bot cannot join to a channel that does not exist`() {
         courseApp.login("aviad", "hunter2").thenCompose { adminToken -> courseApp.channelJoin(adminToken, "#channel").thenApply { adminToken } }.join()
         val bot = bots.bot().thenCompose { bot -> bot.join("#channel").thenApply { bot } }.join()
@@ -50,11 +72,11 @@ class CourseBotStaffTest {
     }
 
     @Test
-    fun `bot cannot do action on a a channel after he was kicked`(){
-        val channelName="#channel"
-        val adminToken=courseApp.login("aviad", "hunter2").thenCompose { adminToken -> courseApp.channelJoin(adminToken, channelName).thenApply { adminToken } }.join()
-        val bot=bots.bot("mybot").thenCompose { bot -> bot.join(channelName).thenApply { bot }}.join()
-        courseApp.channelKick(adminToken,channelName,"mybot")
+    fun `bot cannot do action on a a channel after he was kicked`() {
+        val channelName = "#channel"
+        val adminToken = courseApp.login("aviad", "hunter2").thenCompose { adminToken -> courseApp.channelJoin(adminToken, channelName).thenApply { adminToken } }.join()
+        val bot = bots.bot("mybot").thenCompose { bot -> bot.join(channelName).thenApply { bot } }.join()
+        courseApp.channelKick(adminToken, channelName, "mybot")
         assertThrows<NoSuchEntityException> { runWithTimeout(ofSeconds(10)) { bot.mostActiveUser(channelName).joinException() } }
         assertThrows<NoSuchEntityException> { runWithTimeout(ofSeconds(10)) { bot.richestUser(channelName).joinException() } }
         assertThrows<NoSuchEntityException> { runWithTimeout(ofSeconds(10)) { bot.runSurvey(channelName, "why they torches us?!", listOf("because they can")).joinException() } }
@@ -66,8 +88,8 @@ class CourseBotStaffTest {
                 .thenCompose { adminToken -> courseApp.channelJoin(adminToken, "#channel").thenApply { adminToken } }
                 .join()
         val bot = bots.bot()
-                .thenCompose { bot -> bot.join("#channel").thenApply { bot }}
-                .thenCompose { bot->bot.setTipTrigger("tip").thenApply { bot }}.join()
+                .thenCompose { bot -> bot.join("#channel").thenApply { bot } }
+                .thenCompose { bot -> bot.setTipTrigger("tip").thenApply { bot } }.join()
         courseApp.login("shahar", "pass")
                 .thenCompose { token -> joinChannelAndSendAsUser("#channel", "tip 1000 aviad", token) }
                 .join()
@@ -89,8 +111,8 @@ class CourseBotStaffTest {
                 .thenCompose { adminToken -> courseApp.channelJoin(adminToken, "#channel").thenApply { adminToken } }
                 .join()
         val bot = bots.bot()
-                .thenCompose { bot -> bot.join("#channel").thenApply { bot }}
-                .thenCompose { bot->bot.setTipTrigger("tip").thenApply { bot }}.join()
+                .thenCompose { bot -> bot.join("#channel").thenApply { bot } }
+                .thenCompose { bot -> bot.setTipTrigger("tip").thenApply { bot } }.join()
         courseApp.login("shahar", "pass")
                 .thenCompose { token -> joinChannelAndSendAsUser("#channel", "tip 1000 aviad", token) }.join()
         courseApp.login("ron", "pass")
@@ -289,8 +311,10 @@ class CourseBotStaffTest {
 
     private fun joinChannelAndSendAsUser(channel: String, content: String, userToken: String): CompletableFuture<Unit> {
         return courseApp.channelJoin(userToken, channel)
-                .thenCompose { courseApp.channelSend(userToken, channel,
-                        messageFactory.create(MediaType.TEXT, content.toByteArray()).get()) }
+                .thenCompose {
+                    courseApp.channelSend(userToken, channel,
+                            messageFactory.create(MediaType.TEXT, content.toByteArray()).get())
+                }
     }
 
     @Test
