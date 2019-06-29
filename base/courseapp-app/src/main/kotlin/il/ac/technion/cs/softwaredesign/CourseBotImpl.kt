@@ -228,7 +228,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
 
     override fun part(channelName: String): CompletableFuture<Unit> {
         return courseApp.channelPart(bot.token, channelName)
-                .mapError { throw NoSuchEntityException() }
+                .mapError { e: InvalidTokenException -> throw NoSuchEntityException() }
                 // channel must be exist at this point
                 .thenCompose { cleanAllBotStatisticsOnChannel(channelName) }
                 .thenCompose { getChannelId(channelName) }
