@@ -1,30 +1,35 @@
 # CourseApp: Assignment 3
 
 ## Authors
-* Firstname McLastname, ID number
-* Firstnamey Lastnameson, ID number
+* Ron Yitzhak, 315722744
+* Aviad Shiber, 302935697
 
 ### Previous assignment
-This assignment uses the code from the submission by: <ID1\>-<ID2\>
+This assignment uses the code from the submission by: 315722744-302935697
 
 (This is important for people who switched partners, but everyone needs to fill it out)
 
 ## Library selection
-This submission uses the library identified by the number: <library number\>
+This submission uses the library identified by the number: 2
 
 ## Notes
 
 ### Implementation Summary
-Short summary of your implementation, including data structures used, design choices made, and
-a short tour of the class hierarchy you created.
+Tree of known bots
+Tree of known channels
+all the features includes a specific tree/s to enable holding details per bot, and details per channel in bot
+callbacks are hold in locally in CourseBots to enable callback's removal
+all the data structures in memory are trees.
+In addition to it, all objects has an object model in storage to make read/write operations easier
 
 ### Testing Summary
-Short summary describing the ways you chose to test your code.
+We've implemented course app fake to simulate course app behaviour, and using mockk to check some cases.
+and
 
 ### Difficulties
-Please list any technological difficulties you had while working on this assignment, especially
-with the tools used: Kotlin, JUnit, MockK, Gradle, and Guice.
+many cases that were not defined in the assignment.
+many requirements were written only in the pdf and not in the documentation.
 
 ### Feedback
-Put any feedback you may have for this assignment here. This **will** be read by the course staff,
-and may influence future assignments!
+please write the assignment more clearly, including specify exactly what is the meaning of each operation
+(for example, bot.part method was'nt defined well).
