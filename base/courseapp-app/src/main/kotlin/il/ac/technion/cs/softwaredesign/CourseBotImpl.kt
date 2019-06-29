@@ -382,13 +382,12 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
             : CompletableFuture<String?> {
         val prev = prop.get(bot)
         prop.set(bot, trigger)
-        val callback = buildTriggerCallback(trigger, r, action)
         if (prev != null) {
             val prevCallback = callbacksMap[key]?.getOrNull(0)!!
             courseApp.removeListener(bot.token, prevCallback)
-            callbacksMap[key] = mutableListOf(callback)
         }
         return if(trigger!=null) {
+            val callback = buildTriggerCallback(trigger, r, action)
             callbacksMap[key] = mutableListOf(callback)
             courseApp.addListener(bot.token, callback).thenApply { prev }
         }
