@@ -42,3 +42,14 @@ fun <T> CompletableFuture<T>.joinException(): T {
         throw e.cause!!
     }
 }
+
+private val charPool: List<Char> = ('a'..'z') + ('A'..'Z') + ('0'..'9')
+fun randomChannelName(): String {
+    val randomString = (1..5)
+            .map { i -> kotlin.random.Random.nextInt(0, charPool.size) }
+            .map(charPool::get)
+            .joinToString("");
+
+    return "#$randomString"
+}
+

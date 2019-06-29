@@ -416,7 +416,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
     override fun surveyResults(identifier: String): CompletableFuture<List<Long>> {
         return courseBotApi.findSurvey(identifier)
                 .thenApply {
-                    if (it == null || it.botName != bot.name) listOf()
+                    if (it == null || it.botName != bot.name) throw NoSuchEntityException()
                     else SurveyClient(identifier.toLong(), bot.name, courseBotApi).getVoteCounters()
                 }
     }

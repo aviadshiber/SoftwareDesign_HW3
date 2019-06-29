@@ -23,7 +23,7 @@ import java.time.Duration.ofSeconds
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 
-class CourseBotStaffTest {
+class CourseBotAviadTests {
     private val injector = Guice.createInjector(CourseAppModule(), CourseBotModule(), TestModule())
 
     init {
@@ -38,7 +38,6 @@ class CourseBotStaffTest {
         bots.prepare().join()
         bots.start().join()
     }
-
     @Test
     fun `calc trigger return previous phase`() {
         val listener = mockk<ListenerCallback>(relaxed = true)
@@ -51,6 +50,7 @@ class CourseBotStaffTest {
                 .thenCompose { token -> courseApp.channelJoin(token, "#channel").thenApply { token } }
                 .thenCompose { token -> courseApp.addListener(token, listener).thenApply { token } }
                 .thenCompose { token -> courseApp.channelSend(token, "#channel", messageFactory.create(MediaType.TEXT, "calculate 2+ 20*3".toByteArray()).join()) }
+                .join()
         lastTrigger = bots.bot("Anna0").thenCompose { bot -> bot.setCalculationTrigger("otherCalc") }.join()
         assertThat(lastTrigger, present(equalTo("calculate")))
         lastTrigger = bots.bot("Anna0").thenCompose { bot -> bot.setCalculationTrigger("otherCalc") }.join()
@@ -102,7 +102,7 @@ class CourseBotStaffTest {
 
         courseApp.login("ron", "pass").thenCompose { token -> courseApp.channelJoin(token, "#channel") }.join()
         courseApp.login("matan", "pass").thenCompose { token -> courseApp.channelJoin(token, "#channel").thenApply { token } }
-                .thenCompose { token -> joinChannelAndSendAsUser(token, "#channel", "tip 1000 ron") }
+                .thenCompose { token -> joinChannelAndSendAsUser(token, "#channel", "tip 1000 ron") }.join()
 
         //at this point ron have 2000$ and aviad have 1800$
         val richest: String? = bot.richestUser("#channel").get()
@@ -432,7 +432,7 @@ class CourseBotStaffTest {
     }
 
     @Test
-    fun `requesting results from unExisting survey result in empty list`() {
+    fun `requesting results from unExisting survey result in NoSuchEntityException`() {
         courseApp.login("gal", "hunter2")
                 .thenCompose { token -> courseApp.channelJoin(token, "#channel").thenApply { token } }
                 .join()
@@ -443,13 +443,13 @@ class CourseBotStaffTest {
                 listOf("Cranberry",
                         "Charcoal",
                         "Chocolate-chip Mint")).join()
-        val results = bot.surveyResults("notExisting").join()
-        assertThat(results, equalTo(listOf()))
+
+        assertThrows<NoSuchEntityException> { runWithTimeout(ofSeconds(10)) { bot.surveyResults("notExisting").joinException() } }
 
     }
 
     @Test
-    fun `requesting results of survey from the wrong bot results in empty list`() {
+    fun `requesting results of survey from the wrong bot results end in NoSuchEntityException`() {
         val adminToken = courseApp.login("gal", "hunter2")
                 .thenCompose { token -> courseApp.channelJoin(token, "#channel").thenApply { token } }
                 .join()
@@ -467,12 +467,14 @@ class CourseBotStaffTest {
                         "Charcoal",
                         "Chocolate-chip Mint")).join()
 
-        assertThat(runWithTimeout(ofSeconds(10)) {
-            sendToChannel(adminToken, "#channel", "Chocolate-chip Mint").join()
-            sendToChannel(regularUserToken, "#channel", "Chocolate-chip Mint").join()
-            sendToChannel(adminToken, "#channel", "Chocolate-chip Mint").join()
-            bot2.surveyResults(survey).join()
-        }, equalTo(listOf()))
+        assertThrows<NoSuchEntityException> {
+            runWithTimeout(ofSeconds(10)) {
+                sendToChannel(adminToken, "#channel", "Chocolate-chip Mint").join()
+                sendToChannel(regularUserToken, "#channel", "Chocolate-chip Mint").join()
+                sendToChannel(adminToken, "#channel", "Chocolate-chip Mint").join()
+                bot2.surveyResults(survey).joinException()
+            }
+        }
 
     }
 
