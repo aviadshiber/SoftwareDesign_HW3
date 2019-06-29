@@ -388,9 +388,11 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
             courseApp.removeListener(bot.token, prevCallback)
             callbacksMap[key] = mutableListOf(callback)
         }
-        return courseApp.addListener(bot.token, callback).thenApply { prev }
-
-
+        return if(trigger!=null) {
+            callbacksMap[key] = mutableListOf(callback)
+            courseApp.addListener(bot.token, callback).thenApply { prev }
+        }
+        else ImmediateFuture { prev }
     }
 
     private fun buildTriggerCallback(trigger: String?, r: Regex, action: (source: String, message: Message) -> CompletableFuture<Unit>): ListenerCallback {
