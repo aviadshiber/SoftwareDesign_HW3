@@ -355,10 +355,15 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
             : CompletableFuture<String?> {
         val prev = prop.get(bot)
         prop.set(bot, trigger)
-        return if (prev != null) {
+        return if (prev != null && trigger != null) {
             val prevRegex = calculationTriggerRegex(prev)
             courseApp.removeListener(bot.token, buildTriggerCallback(prev, prevRegex, createAction(prevRegex)))
                     .thenCompose { courseApp.addListener(bot.token, buildTriggerCallback(trigger, r, action)).thenApply { prev } }
+        } else if (prev != null && trigger == null) {
+            val prevRegex = calculationTriggerRegex(prev)
+            courseApp.removeListener(bot.token, buildTriggerCallback(prev, prevRegex, createAction(prevRegex))).thenApply { prev }
+        } else if (prev == null && trigger == null) {
+            ImmediateFuture<String?> { null }
         } else {
             courseApp.addListener(bot.token, buildTriggerCallback(trigger, r, action)).thenApply { prev }
         }
@@ -371,7 +376,6 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
             else ImmediateFuture { }
         }
     }
-
 
     override fun setTipTrigger(trigger: String?): CompletableFuture<String?> {
         val regex = tippingRegex(trigger) //$trigger $number $user
