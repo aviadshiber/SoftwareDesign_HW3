@@ -9,13 +9,12 @@ import il.ac.technion.cs.softwaredesign.models.BotsModel
 import il.ac.technion.cs.softwaredesign.services.Bot
 import il.ac.technion.cs.softwaredesign.services.CourseBotApi
 import il.ac.technion.cs.softwaredesign.trees.TreeWrapper
+import il.ac.technion.cs.softwaredesign.utils.BotId
 import io.github.vjames19.futures.jdk8.ImmediateFuture
 import java.util.concurrent.CompletableFuture
 import javax.inject.Inject
 import javax.inject.Singleton
 
-
-typealias  BotId = Long
 
 @Singleton
 class CourseBotsImpl @Inject constructor(private val courseApp: CourseApp,

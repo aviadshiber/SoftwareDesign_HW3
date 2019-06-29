@@ -42,6 +42,10 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
         private const val msgCounterTreeType = "msgCounter"
         private const val surveyTreeType = "surveyTreeType"
         private const val lastSeenTreeType = "lastSeenTreeType"
+        private const val lastSeenCallbackPrefix = "lastSeenMessage"
+        private const val mostActiveCallbackPrefix = "mostActive"
+        private const val surveyCallbackPrefix = "surveycallbacks"
+        private const val countCallbackPrefix = "countCallbacks"
 
         private const val keySeperator = "~"
         fun combineArgsToString(vararg values: Any?): String =
@@ -51,6 +55,9 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
     private val channelTreeWrapper: TreeWrapper = TreeWrapper(courseBotApi, "channel_")
     private val botTreeWrapper: TreeWrapper = TreeWrapper(courseBotApi, "bot_")
     private val lastSeenUserTreeWrapper: TreeWrapper = TreeWrapper(courseBotApi, "bot_")
+
+    private val callbacksMap: MutableMap<String, MutableList<ListenerCallback>> = mutableMapOf()
+
 
 
     // TODO: 2 options: list insert will get id.toString() or channel name
@@ -119,8 +126,22 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
                 .thenCompose { createChannelIfNotExist(channelName) }
                 .thenCompose { channelId -> addChannelToBot(channelName, channelId) }
                 .thenCompose { addBotToChannel(channelName) }
-                .thenCompose { courseApp.addListener(bot.token, buildLastSeenMsgCallback(channelName)) }
-                .thenCompose { courseApp.addListener(bot.token, buildMostActiveUserCallback(channelName)) }
+                .thenCompose { addChannelListener(lastSeenCallbackPrefix, channelName, buildLastSeenMsgCallback(channelName)) }
+                .thenCompose { addChannelListener(mostActiveCallbackPrefix, channelName, buildMostActiveUserCallback(channelName)) }
+    }
+
+    private fun addChannelListener(keyPrefix: String, channelName: String?, callback: ListenerCallback): CompletableFuture<Unit> {
+        val key = combineArgsToString(keyPrefix, channelName)
+        if (callbacksMap[key] == null)
+            callbacksMap[key] = mutableListOf(callback)
+        else
+            callbacksMap[key]!!.add(callback)
+        return courseApp.addListener(bot.token, callback)
+    }
+
+    private fun removeChannelListeners(keyPrefix: String, channelName: String): CompletableFuture<Unit> {
+        val callbacks = callbacksMap[combineArgsToString(keyPrefix, channelName)]!!
+        return callbacks.mapComposeList { callback -> courseApp.removeListener(bot.token, callback) }
     }
 
     fun loadAllBotListeners(): CompletableFuture<Unit> {
@@ -137,7 +158,8 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
                         MessageCounterTreeKey.buildFromString(key).botName == bot.name
                     }.mapComposeList { key ->
                         val extractedKey = MessageCounterTreeKey.buildFromString(key)
-                        courseApp.addListener(bot.token, buildBeginCountCallback(extractedKey.botName, extractedKey.channelName, extractedKey.regex, extractedKey.mediaType))
+                        val channelName = extractedKey.channelName
+                        addChannelListener(countCallbackPrefix, channelName, buildBeginCountCallback(bot.name, channelName, extractedKey.regex, extractedKey.mediaType))
                     }
                 }
         val surveys = courseBotApi.treeGet(surveyTreeType, bot.name)
@@ -145,7 +167,8 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
                     it.mapComposeList { key ->
                         val sid = SurveiesTreeKey.buildFromString(key).surveyId
                         val survey = SurveyClient(sid.toLong(), bot.name, courseBotApi)
-                        courseApp.addListener(bot.token, buildSurveyCallback(survey.channel, survey))
+                        val channel = survey.channel
+                        addChannelListener(surveyCallbackPrefix, channel, buildSurveyCallback(channel, survey))
                     }
                 }.thenDispose()
 
@@ -227,6 +250,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
                 .thenCompose { channelId -> botTreeWrapper.treeContains(BotModel.LIST_BOT_CHANNELS, botName, GenericKeyPair(channelId, sourceChannelName)) }
     }
 
+
     override fun part(channelName: String): CompletableFuture<Unit> {
         return courseApp.channelPart(bot.token, channelName)
                 .mapError { e: InvalidTokenException -> throw NoSuchEntityException() }
@@ -235,8 +259,10 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
                 .thenCompose { getChannelId(channelName) }
                 .thenCompose { channelId -> removeChannelFromBot(channelName, channelId) }
                 .thenCompose { removeBotFromChannel(channelName) }
-                .thenCompose { courseApp.removeListener(bot.token, buildLastSeenMsgCallback(channelName)) }
-                .thenCompose { courseApp.removeListener(bot.token, buildMostActiveUserCallback(channelName)) }
+                .thenCompose { removeChannelListeners(countCallbackPrefix, channelName) }
+                .thenCompose { removeChannelListeners(lastSeenCallbackPrefix, channelName) }
+                .thenCompose { removeChannelListeners(mostActiveCallbackPrefix, channelName) }
+                .thenCompose { removeChannelListeners(surveyCallbackPrefix, channelName) }
     }
 
     private fun cleanAllBotStatisticsOnChannel(channelName: String): CompletableFuture<Unit> {
@@ -306,8 +332,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
         if (regex == null && mediaType == null) throw IllegalArgumentException()
 //        val countCallback: ListenerCallback = buildBeginCountCallback(bot.name, channel, regex, mediaType)
         return beginCountCountersInit(bot.name, channel, regex, mediaType)
-                .thenApply { buildBeginCountCallback(bot.name, channel, regex, mediaType) }
-                .thenCompose { countCallback -> courseApp.addListener(bot.token, countCallback) }
+                .thenCompose { addChannelListener(countCallbackPrefix, channel, buildBeginCountCallback(bot.name, channel, regex, mediaType)) }
     }
 
     /**
@@ -333,7 +358,8 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
 
     override fun setCalculationTrigger(trigger: String?): CompletableFuture<String?> {
         val regex = calculationTriggerRegex(trigger)
-        return setCallBackForTrigger(Bot::calculationTrigger, trigger, regex) { source: String, message: Message ->
+
+        return setCallBackForTrigger(Bot::calculationTrigger, trigger, "calculationTrigger", regex) { source: String, message: Message ->
             val content = String(message.contents)
             val (expression) = regex.find(content)!!.destructured
             try {
@@ -350,12 +376,18 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
 
     private fun calculationTriggerRegex(trigger: String?) = """$trigger ([()\s\d*+-/]+)""".toRegex()
 
-    private fun setCallBackForTrigger(prop: KMutableProperty1<Bot, String?>, trigger: String?, r: Regex,
+    private fun setCallBackForTrigger(prop: KMutableProperty1<Bot, String?>, trigger: String?, key: String, r: Regex,
                                       action: (source: String, message: Message) -> CompletableFuture<Unit>)
             : CompletableFuture<String?> {
         val prev = prop.get(bot)
         prop.set(bot, trigger)
-        return courseApp.addListener(bot.token, buildTriggerCallback(trigger, r, action)).thenApply { prev }
+        val callback = buildTriggerCallback(trigger, r, action)
+        if (prev != null) {
+            val prevCallback = callbacksMap[key]?.getOrNull(0)!!
+            courseApp.removeListener(bot.token, prevCallback)
+            callbacksMap[key] = mutableListOf(callback)
+        }
+        return courseApp.addListener(bot.token, callback).thenApply { prev }
 
 
     }
@@ -363,7 +395,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
     private fun buildTriggerCallback(trigger: String?, r: Regex, action: (source: String, message: Message) -> CompletableFuture<Unit>): ListenerCallback {
         return { source: String, message: Message ->
             val content = String(message.contents)
-            if (isChannelNameValid(source) && trigger != null && r matches content) action(source, message)
+            if (isChannelNameValid(source) && trigger != null && r matches content && message.media == MediaType.TEXT) action(source, message)
             else ImmediateFuture { }
         }
     }
@@ -371,7 +403,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
 
     override fun setTipTrigger(trigger: String?): CompletableFuture<String?> {
         val regex = tippingRegex(trigger) //$trigger $number $user
-        return setCallBackForTrigger(Bot::tipTrigger, trigger, regex) { source: String, message: Message ->
+        return setCallBackForTrigger(Bot::tipTrigger, trigger, "tipTrigger", regex) { source: String, message: Message ->
             val content = String(message.contents)
             val (number, destUserName) = regex.find(content)!!.destructured
             val channelName = source.channelName
@@ -408,7 +440,9 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
         return validateBotInChannel(channel)
                 .thenCompose { generateSurveyId() }.thenCompose { id -> SurveyClient(id, bot.name, courseBotApi).createQuestion(question, channel) }
                 .thenCompose { survey -> survey.putAnswers(answers).thenApply { survey } }
-                .thenCompose { survey -> courseApp.addListener(bot.token, buildSurveyCallback(channel, survey)).thenApply { survey } }
+                .thenCompose { survey ->
+                    addChannelListener(surveyCallbackPrefix, channel, buildSurveyCallback(channel, survey)).thenApply { survey }
+                }
                 .thenCompose { survey -> messageFactory.create(MediaType.TEXT, question.toByteArray()).thenApply { Pair(survey, it) } }
                 .thenCompose { (survey, m) -> courseApp.channelSend(bot.token, channel, m).thenApply { survey.id } }
                 .thenCompose { surveyId ->
@@ -416,6 +450,16 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
                     courseBotApi.treeInsert(surveyTreeType, bot.name, GenericKeyPair(0L, botNameSurveyId)).thenApply { surveyId }
                 }
     }
+
+    override fun surveyResults(identifier: String): CompletableFuture<List<Long>> {
+        return courseBotApi.findSurvey(identifier)
+                .thenApply {
+                    if (it == null || it.botName != bot.name) throw NoSuchEntityException()
+                    else SurveyClient(identifier.toLong(), bot.name, courseBotApi).getVoteCounters()
+                }
+    }
+
+
 
 
     // botname_channel_surveyId
@@ -426,7 +470,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
                     val content = String(message.contents)
                     val sender = source.sender
                     surveyClient.getAnswers().thenCompose { answers ->
-                        answers.filter { answer -> content.contentEquals(answer) }
+                        answers.filter { answer: String -> content.contentEquals(answer) }
                                 .mapComposeList { answer -> surveyClient.voteForAnswer(answer, sender) }
                     }
                 } else ImmediateFuture { }
@@ -434,13 +478,6 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
         }
     }
 
-    override fun surveyResults(identifier: String): CompletableFuture<List<Long>> {
-        return courseBotApi.findSurvey(identifier)
-                .thenApply {
-                    if (it == null || it.botName != bot.name) throw NoSuchEntityException()
-                    else SurveyClient(identifier.toLong(), bot.name, courseBotApi).getVoteCounters()
-                }
-    }
 
     private val String.channelName: String
         get() {

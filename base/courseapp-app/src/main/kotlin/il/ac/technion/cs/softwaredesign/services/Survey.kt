@@ -6,13 +6,13 @@ import il.ac.technion.cs.softwaredesign.lib.utils.mapComposeList
 import il.ac.technion.cs.softwaredesign.lib.utils.thenDispose
 import il.ac.technion.cs.softwaredesign.models.SurveyModel
 import il.ac.technion.cs.softwaredesign.trees.TreeWrapper
+import il.ac.technion.cs.softwaredesign.utils.Answer
+import il.ac.technion.cs.softwaredesign.utils.AnswerCount
+import il.ac.technion.cs.softwaredesign.utils.Question
+import il.ac.technion.cs.softwaredesign.utils.UserName
 import io.github.vjames19.futures.jdk8.ImmediateFuture
 import java.util.concurrent.CompletableFuture
 
-typealias Answer = String
-typealias Question = String
-typealias AnswerCount = Long
-typealias UserName = String
 
 class SurveyClient constructor(surveyId: Long, private val botName: String, private val botApi: CourseBotApi) {
     // surevyId_username-> answerIndex
