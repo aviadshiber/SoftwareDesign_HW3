@@ -252,15 +252,16 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
     }
 
     private fun invalidateCounter(channelName: String?, treeType: String, name: String): CompletableFuture<Unit> {
-        return courseBotApi.treeToSequence(treeType, name).thenApply { seq ->
-            seq.filter { (genericKey, _) ->
-                botAndChannelMatchKeyPair(treeType, genericKey, channelName) }
-                    .map {
-                        (genericKey, _) ->
-                        courseBotApi.deleteCounter(genericKey.getSecond()).thenCompose {
-                            courseBotApi.treeRemove(treeType, name, genericKey)
-                        }
-                    }
+        return courseBotApi.treeToSequence(treeType, name)
+                .thenApply { seq ->
+                    seq.filter { (genericKey, _) ->
+                            botAndChannelMatchKeyPair(treeType, genericKey, channelName) }
+                        .map {
+                            (genericKey, _) ->
+                            courseBotApi.deleteCounter(genericKey.getSecond()).thenCompose {
+                                courseBotApi.treeRemove(treeType, name, genericKey)
+                            }
+                        }.toList()
         }.thenDispose()
     }
 
