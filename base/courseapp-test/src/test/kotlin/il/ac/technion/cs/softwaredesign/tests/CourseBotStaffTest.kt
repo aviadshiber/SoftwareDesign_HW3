@@ -531,7 +531,71 @@ class CourseBotStaffTest {
         assertThat(runWithTimeout(ofSeconds(10)) {
             bot.mostActiveUser(channelName).join()
         }, present(equalTo("aviad")))
+    }
+
+@Test
+    fun `bot join part and join`() {
+        val channelName = "#channel"
+        val bot = bots.bot("bot1")
+                .thenCompose { bot -> bot.join(channelName).thenApply { bot } }
+                .thenCompose { bot -> bot.part(channelName).thenApply { bot } }
+                .thenCompose { bot -> bot.join(channelName).thenApply { bot } }
+                .thenCompose { bot -> bot.join(channelName).thenApply { bot } }
+                .thenCompose { bot -> bot.join(channelName).thenApply { bot } }
+                .join()
+        bots.bot("bot22")
+            .thenCompose { b -> b.join(channelName + channelName)}
+        assertThat(runWithTimeout(ofSeconds(10)) {
+            bots.bots(channelName).join()
+        }, equalTo(listOf("bot1")))
+        assertThat(runWithTimeout(ofSeconds(10)) {
+            bots.bots(null).join()
+        }, equalTo(listOf("bot1", "bot22")))
+    }
+
+    @Test
+    fun `after part, global counter didbt change`() {
+        val regex = ".*ello.*[wW]orl.*"
+        val channelName = "#channel"
+        val adminToken = courseApp.login("admin", "pass")
+                .thenCompose { token -> courseApp.channelJoin(token, channelName).thenApply { token } }
+                .join()
+        val aviad = courseApp.login("aviad", "123")
+                .thenCompose { token -> courseApp.channelJoin(token, channelName).thenApply { token } }
+                .join()
+        val ron = courseApp.login("ron", "ron123")
+                .thenCompose { token -> courseApp.channelJoin(token, channelName).thenApply { token } }
+                .join()
 
 
+        val bot = bots.bot("bot1")
+                .thenCompose { bot -> bot.join(channelName).thenApply { bot } }
+                .thenCompose { bot -> bot.beginCount(null, regex, mediaType = MediaType.TEXT).thenApply { bot } }
+                .thenCompose { bot -> bot.beginCount(channelName, regex, mediaType = MediaType.TEXT).thenApply { bot } }
+                .thenCompose { bot -> sendToChannel(adminToken, channelName, "hello, World").thenApply { bot } }
+                .thenCompose { bot -> sendToChannel(aviad, channelName, "hello, World").thenApply { bot } }
+                .thenCompose { bot -> sendToChannel(ron, channelName, "hello, World").thenApply { bot } }
+                .thenCompose { bot -> sendToChannel(ron, channelName, "hello, World").thenApply { bot } }
+                .thenCompose { bot -> sendToChannel(ron, channelName, "hello, World").thenApply { bot } }
+                //.thenCompose { bot -> bot.part(channelName).thenApply { bot } }
+                .join()
+
+        assertThat(runWithTimeout(ofSeconds(10)) {
+            bot.count(channelName, regex, MediaType.TEXT).join()
+        }, equalTo(5L))
+
+        assertThat(runWithTimeout(ofSeconds(10)) {
+            bot.count(null, regex, MediaType.TEXT).join()
+        }, equalTo(5L))
+
+        bot.part(channelName).join()
+
+        assertThat(runWithTimeout(ofSeconds(10)) {
+            bot.count(channelName, regex, MediaType.TEXT).join()
+        }, equalTo(0L))
+
+        assertThat(runWithTimeout(ofSeconds(10)) {
+            bot.count(null, regex, MediaType.TEXT).join()
+        }, equalTo(5L))
     }
 }
