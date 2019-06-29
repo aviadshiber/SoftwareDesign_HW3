@@ -227,7 +227,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
 
     override fun part(channelName: String): CompletableFuture<Unit> {
         return courseApp.channelPart(bot.token, channelName)
-                .recover { throw NoSuchEntityException() }
+                .exceptionally { throw NoSuchEntityException() }
                 // channel must be exist at this point
                 .thenCompose { cleanAllBotStatisticsOnChannel(channelName) }
                 .thenCompose { getChannelId(channelName) }
@@ -439,7 +439,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
 
     private fun validateBotInChannel(channel: String) =
             courseApp.isUserInChannel(bot.token, channel, bot.name)
-                    .recover { if (it !is InvalidTokenException) throw NoSuchEntityException() else throw it }
+                    .exceptionally { if (it !is InvalidTokenException) throw NoSuchEntityException() else throw it }
 
     private fun shouldBeCountMessage(regex: String?, mediaType: MediaType?, source: String, message: Message): Boolean {
         if (!isChannelNameValid(source)) return false
