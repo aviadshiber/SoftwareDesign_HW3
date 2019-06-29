@@ -83,6 +83,45 @@ class CourseBotStaffTest {
     }
 
     @Test
+    fun `user can not tip more than he have`() {
+        val aviad = courseApp.login("aviad", "hunter2")
+                .thenCompose { adminToken -> courseApp.channelJoin(adminToken, "#channel").thenApply { adminToken } }
+                .join()
+        val bot = bots.bot()
+                .thenCompose { bot -> bot.join("#channel").thenApply { bot } }
+                .thenCompose { bot -> bot.setTipTrigger("tip").thenApply { bot } }.join()
+        val shahar = courseApp.login("shahar", "pass")
+                .thenCompose { token -> joinChannelAndSendAsUser(token, "#channel", "tip 800 aviad").thenApply { token } }
+                .join()
+        sendToChannel(shahar, "#channel", "tip 400 aviad").join()
+        //at this point aviad should have 1800$ because shahar dont have 400$ to give
+
+
+        courseApp.login("ron", "pass").thenCompose { token -> courseApp.channelJoin(token, "#channel") }.join()
+        courseApp.login("matan", "pass").thenCompose { token -> courseApp.channelJoin(token, "#channel").thenApply { token } }
+                .thenCompose { token -> joinChannelAndSendAsUser(token, "#channel", "tip 1000 ron") }
+
+        //at this point ron have 2000$ and aviad have 1800$
+        val richest: String? = bot.richestUser("#channel").get()
+        assertThat(richest, present(equalTo("ron")))
+    }
+
+    @Test
+    fun `if no tip was triggered then richestUser returns null`() {
+        courseApp.login("aviad", "hunter2")
+                .thenCompose { adminToken -> courseApp.channelJoin(adminToken, "#channel").thenApply { adminToken } }
+                .join()
+        val bot = bots.bot()
+                .thenCompose { bot -> bot.join("#channel").thenApply { bot } }
+                .thenCompose { bot -> bot.setTipTrigger("tip").thenApply { bot } }.join()
+        courseApp.login("shahar", "pass")
+                .thenCompose { token -> joinChannelAndSendAsUser(token, "#channel", "tip 1000 notExistingUser") }
+                .join()
+        val richest: String? = bot.richestUser("#channel").get()
+        assertThat(richest, absent())
+    }
+
+    @Test
     fun `bot cash tracks get reset after bot leave channel`() {
         courseApp.login("aviad", "hunter2")
                 .thenCompose { adminToken -> courseApp.channelJoin(adminToken, "#channel").thenApply { adminToken } }
@@ -91,10 +130,10 @@ class CourseBotStaffTest {
                 .thenCompose { bot -> bot.join("#channel").thenApply { bot } }
                 .thenCompose { bot -> bot.setTipTrigger("tip").thenApply { bot } }.join()
         courseApp.login("shahar", "pass")
-                .thenCompose { token -> joinChannelAndSendAsUser("#channel", "tip 1000 aviad", token) }
+                .thenCompose { token -> joinChannelAndSendAsUser(token, "#channel", "tip 1000 aviad") }
                 .join()
         courseApp.login("ron", "pass")
-                .thenCompose { token -> joinChannelAndSendAsUser("#channel", "tip 500 shahar", token) }
+                .thenCompose { token -> joinChannelAndSendAsUser(token, "#channel", "tip 500 shahar") }
                 .join()
         assertThat(runWithTimeout(ofSeconds(10)) {
             bot.richestUser("#channel").get()
@@ -114,11 +153,11 @@ class CourseBotStaffTest {
                 .thenCompose { bot -> bot.join("#channel").thenApply { bot } }
                 .thenCompose { bot -> bot.setTipTrigger("tip").thenApply { bot } }.join()
         courseApp.login("shahar", "pass")
-                .thenCompose { token -> joinChannelAndSendAsUser("#channel", "tip 1000 aviad", token) }.join()
+                .thenCompose { token -> joinChannelAndSendAsUser(token, "#channel", "tip 1000 aviad") }.join()
         courseApp.login("ron", "pass")
-                .thenCompose { token -> joinChannelAndSendAsUser("#channel", "tip 1000 shahar", token) }.join()
+                .thenCompose { token -> joinChannelAndSendAsUser(token, "#channel", "tip 1000 shahar") }.join()
         courseApp.login("gal", "pass")
-                .thenCompose { token -> joinChannelAndSendAsUser("#channel", "tip 1000 shahar", token) }.join()
+                .thenCompose { token -> joinChannelAndSendAsUser(token, "#channel", "tip 1000 shahar") }.join()
         val richest: String? = bot.richestUser("#channel").get()
 
         assertThat(richest, absent())
@@ -137,7 +176,7 @@ class CourseBotStaffTest {
                 .thenCompose { bot ->
                     bot.join("#channel").thenApply { bot }.thenCompose { bot.beginCount("#channel", "hello", MediaType.TEXT) }
                 }
-                .thenCompose { courseApp.login("shahar", "pass").thenCompose { token -> joinChannelAndSendAsUser("#channel", "hello", token) } }.join()
+                .thenCompose { courseApp.login("shahar", "pass").thenCompose { token -> joinChannelAndSendAsUser(token, "#channel", "hello") } }.join()
 
 
 
@@ -309,13 +348,13 @@ class CourseBotStaffTest {
         }, present(equalTo("gal")))
     }
 
-    private fun joinChannelAndSendAsUser(channel: String, content: String, userToken: String): CompletableFuture<Unit> {
-        return courseApp.channelJoin(userToken, channel)
-                .thenCompose {
-                    courseApp.channelSend(userToken, channel,
-                            messageFactory.create(MediaType.TEXT, content.toByteArray()).get())
-                }
+    private fun joinChannelAndSendAsUser(userToken: String, channel: String, content: String): CompletableFuture<Unit> {
+        return courseApp.channelJoin(userToken, channel).thenCompose { sendToChannel(userToken, channel, content) }
     }
+
+    private fun sendToChannel(userToken: String, channel: String, content: String) =
+            courseApp.channelSend(userToken, channel,
+                    messageFactory.create(MediaType.TEXT, content.toByteArray()).get())
 
     @Test
     fun `The bot accurately tracks keywords`() {
@@ -329,7 +368,7 @@ class CourseBotStaffTest {
                                         .thenCompose { bot -> bot.join(channel).thenApply { bot } }
                                         .thenCompose { bot -> bot.beginCount(regex = regex) }
                             }
-                            .thenCompose { courseApp.login("matan", "pass").thenCompose { token -> joinChannelAndSendAsUser(channel, "hello, world!", token) } }
+                            .thenCompose { courseApp.login("matan", "pass").thenCompose { token -> joinChannelAndSendAsUser(token, channel, "hello, world!") } }
                 }.join()
 
         assertThat(runWithTimeout(ofSeconds(10)) {
