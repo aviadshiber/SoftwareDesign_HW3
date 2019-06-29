@@ -441,7 +441,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
 
     private fun validateBotInChannel(channel: String) =
             courseApp.isUserInChannel(bot.token, channel, bot.name)
-                    .exceptionally { if (it !is InvalidTokenException) throw NoSuchEntityException() else throw it }
+                    .exceptionally { if (it.cause !is InvalidTokenException) throw NoSuchEntityException() else throw it }
 
     private fun shouldBeCountMessage(regex: String?, mediaType: MediaType?, source: String, message: Message): Boolean {
         if (!isChannelNameValid(source)) return false

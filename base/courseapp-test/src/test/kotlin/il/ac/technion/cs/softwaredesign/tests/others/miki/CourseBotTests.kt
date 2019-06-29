@@ -568,27 +568,27 @@ class CourseBotMikiTests {
             val callback: ListenerCallback = mockk(relaxed = true)
             val msg = slot<Message>()
             every {
-                callback("#facebook@John", capture(msg))
-            } answers {
-                CompletableFuture.completedFuture(Unit)
-            }
-
-            every {
                 callback(any(), any())
             } answers {
                 CompletableFuture.completedFuture(Unit)
             }
 
+            every {
+                callback("#facebook@John", capture(msg))
+            } answers {
+                CompletableFuture.completedFuture(Unit)
+            }
+
             val survey = bot.join(channel1)
-                    .thenCompose { bot.runSurvey(channel1, question, answers) }
                     .thenForward { courseApp.channelJoin(user1, channel1) }
                     .thenForward { courseApp.channelJoin(user2, channel1) }
                     .thenForward { courseApp.addListener(user1, callback) }
                     .thenForward { courseApp.addListener(user2, callback) }
+                    .thenCompose { bot.runSurvey(channel1, question, answers) }
                     .join()
 
-//            verify(exactly = 3) { callback(match { it == "#facebook@John" }, any()) }
-//            assertThat(String(msg.captured.contents), equalTo(question))
+            verify(exactly = 2) { callback(match { it == "#facebook@John" }, any()) }
+            assertThat(String(msg.captured.contents), equalTo(question))
 
             val results = courseApp.channelSend(user1, channel1, messageFactory.create(MediaType.TEXT, a1.toByteArray()).join())
                     .thenCompose { courseApp.channelSend(user2, channel1, messageFactory.create(MediaType.TEXT, a2.toByteArray()).join()) }
