@@ -15,12 +15,12 @@ This submission uses the library identified by the number: 2
 ## Notes
 
 ### Implementation Summary
-  -Tree of known bots
-  -Tree of known channels
-  -All the features includes a specific tree/s to enable holding details per bot, and details per channel in bot
-  -Callbacks are hold in locally in CourseBots to enable callback's removal
-  -All the data structures in memory are trees
-  -All objects has an object model in storage to make read/write operations easier
+  - Tree of known bots
+  - Tree of known channels
+  - All the features includes a specific tree/s to enable holding details per bot, and details per channel in bot
+  - Callbacks are hold in locally in CourseBots to enable callback's removal
+  - All the data structures in memory are trees
+  - All objects has an object model in storage to make read/write operations easier
 
 ### Testing Summary
   We've implemented course app fake to simulate course app behaviour, and using mockk to check some cases
