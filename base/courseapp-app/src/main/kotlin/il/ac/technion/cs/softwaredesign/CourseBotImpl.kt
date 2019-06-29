@@ -453,6 +453,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
     private fun validateBotInChannel(channel: String) =
             courseApp.isUserInChannel(bot.token, channel, bot.name)
                     .mapError { e: UserNotAuthorizedException -> throw NoSuchEntityException() }
+                    .thenApply { if (it == false) throw NoSuchEntityException() }
 
     private fun shouldBeCountMessage(regex: String?, mediaType: MediaType?, source: String, message: Message): Boolean {
         if (!isChannelNameValid(source)) return false
