@@ -41,7 +41,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
         const val KEY_LAST_SURVEY_ID = "lastChannelId"
         private const val msgCounterTreeType = "msgCounter"
         private const val surveyTreeType = "surveyTreeType"
-        private const val lastSeenTreeType="lastSeenTreeType"
+        private const val lastSeenTreeType = "lastSeenTreeType"
         private const val keySeperator = "~"
         fun combineArgsToString(vararg values: Any?): String =
                 values.joinToString(separator = keySeperator) { it?.toString() ?: "" }
@@ -179,14 +179,14 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
                 lastSeenUserTreeWrapper.treeSearch(lastSeenTreeType, bot.name, key).thenCompose { timeString ->
                     updateLastSeenForNewMessageFuture(key, timeString, message)
                 }
-            }else{
-                ImmediateFuture {  }
+            } else {
+                ImmediateFuture { }
             }
         }
     }
 
     private fun updateLastSeenForNewMessageFuture(key: GenericKeyPair<Long, String>, timeString: String?, message: Message): CompletableFuture<Unit> {
-        val messageCreatedTimeInString= message.created.convertToString()
+        val messageCreatedTimeInString = message.created.convertToString()
         return if (timeString == null) lastSeenUserTreeWrapper.treeInsert(lastSeenTreeType, bot.name, key, messageCreatedTimeInString).thenDispose()
         else {
 
@@ -257,14 +257,14 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
         return courseBotApi.treeToSequence(treeType, name)
                 .thenApply { seq ->
                     seq.filter { (genericKey, _) ->
-                            botAndChannelMatchKeyPair(treeType, genericKey, channelName) }
-                        .map {
-                            (genericKey, _) ->
-                            restartCounter(genericKey.getSecond()).thenCompose {
-                                courseBotApi.treeRemove(treeType, name, genericKey)
-                            }
-                        }.toList()
-        }.thenDispose()
+                        botAndChannelMatchKeyPair(treeType, genericKey, channelName)
+                    }
+                            .map { (genericKey, _) ->
+                                restartCounter(genericKey.getSecond()).thenCompose {
+                                    courseBotApi.treeRemove(treeType, name, genericKey)
+                                }
+                            }.toList()
+                }.thenDispose()
     }
 
     private fun botAndChannelMatchKeyPair(treeType: String, genericKey: GenericKeyPair<Long, String>, channelName: String?): Boolean {
@@ -315,8 +315,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
      */
     private fun incCounterValue(counterId: String): CompletableFuture<Counter> {
         return courseBotApi.findCounter(counterId)
-                .thenCompose {
-                    counter ->
+                .thenCompose { counter ->
                     if (counter == null) courseBotApi.createCounter(counterId)
                             .thenCompose { courseBotApi.updateCounter(counterId, 1L) }
                     else courseBotApi.updateCounter(counterId, counter.value + 1L)
@@ -336,9 +335,15 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
         return setCallBackForTrigger(Bot::calculationTrigger, trigger, regex) { source: String, message: Message ->
             val content = String(message.contents)
             val (expression) = regex.find(content)!!.destructured
-            val solution = Value(expression).resolve().toInt()
-            val messageFuture = messageFactory.create(MediaType.TEXT, "$solution".toByteArray(Charsets.UTF_8))
-            messageFuture.thenCompose { courseApp.channelSend(bot.token, source.channelName, it) }
+            var solution: Int
+            try {
+                solution = Value(expression).resolve().toInt()
+                val messageFuture = messageFactory.create(MediaType.TEXT, "$solution".toByteArray(Charsets.UTF_8))
+                messageFuture.thenCompose { courseApp.channelSend(bot.token, source.channelName, it) }
+            } catch (e: Exception) {
+                ImmediateFuture { }
+            }
+
         }
     }
 
@@ -349,13 +354,19 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
             : CompletableFuture<String?> {
         val prev = prop.get(bot)
         prop.set(bot, trigger)
-        val triggerCallback: ListenerCallback = { source: String, message: Message ->
+        return courseApp.removeListener(bot.token, buildTriggerCallback(prev, r, action))
+                .thenCompose { courseApp.addListener(bot.token, buildTriggerCallback(trigger, r, action)).thenApply { prev } }
+
+    }
+
+    private fun buildTriggerCallback(trigger: String?, r: Regex, action: (source: String, message: Message) -> CompletableFuture<Unit>): ListenerCallback {
+        return { source: String, message: Message ->
             val content = String(message.contents)
             if (isChannelNameValid(source) && trigger != null && r matches content) action(source, message)
             else ImmediateFuture { }
         }
-        return courseApp.addListener(bot.token, triggerCallback).thenApply { prev }
     }
+
 
     override fun setTipTrigger(trigger: String?): CompletableFuture<String?> {
         val regex = tippingRegex(trigger) //$trigger $number $user
@@ -377,8 +388,8 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
     private fun tippingRegex(trigger: String?) = """$trigger (\d+) (.*)""".toRegex()
 
     override fun seenTime(user: String): CompletableFuture<LocalDateTime?> {
-        return lastSeenUserTreeWrapper.treeSearch(lastSeenTreeType,bot.name,GenericKeyPair(0L,user))
-                .thenApply {timeString-> timeString?.convertToLocalDateTime() }
+        return lastSeenUserTreeWrapper.treeSearch(lastSeenTreeType, bot.name, GenericKeyPair(0L, user))
+                .thenApply { timeString -> timeString?.convertToLocalDateTime() }
     }
 
     override fun mostActiveUser(channel: String): CompletableFuture<String?> {
@@ -441,8 +452,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
 
     private fun validateBotInChannel(channel: String) =
             courseApp.isUserInChannel(bot.token, channel, bot.name)
-                    .exceptionally { if (it.cause !is InvalidTokenException) throw NoSuchEntityException() else throw it }
-                    .thenApply { if (it == false) throw NoSuchEntityException() }
+                    .mapError { e: UserNotAuthorizedException -> throw NoSuchEntityException() }
 
     private fun shouldBeCountMessage(regex: String?, mediaType: MediaType?, source: String, message: Message): Boolean {
         if (!isChannelNameValid(source)) return false
