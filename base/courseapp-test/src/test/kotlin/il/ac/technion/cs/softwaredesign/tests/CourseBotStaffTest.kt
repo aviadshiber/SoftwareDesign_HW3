@@ -5,11 +5,13 @@ import com.google.inject.Guice
 import com.natpryce.hamkrest.absent
 import com.natpryce.hamkrest.assertion.assertThat
 import com.natpryce.hamkrest.equalTo
+import com.natpryce.hamkrest.lessThan
 import com.natpryce.hamkrest.present
 import il.ac.technion.cs.softwaredesign.*
 import il.ac.technion.cs.softwaredesign.exceptions.NoSuchEntityException
 import il.ac.technion.cs.softwaredesign.exceptions.UserNotAuthorizedException
 import il.ac.technion.cs.softwaredesign.messages.MediaType
+import il.ac.technion.cs.softwaredesign.messages.Message
 import il.ac.technion.cs.softwaredesign.messages.MessageFactory
 import io.github.vjames19.futures.jdk8.ImmediateFuture
 import io.mockk.every
@@ -19,6 +21,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import java.time.Duration.ofSeconds
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.TimeUnit
 
 class CourseBotStaffTest {
     private val injector = Guice.createInjector(CourseAppModule(), CourseBotModule(), TestModule())
@@ -348,13 +351,13 @@ class CourseBotStaffTest {
         }, present(equalTo("gal")))
     }
 
-    private fun joinChannelAndSendAsUser(userToken: String, channel: String, content: String): CompletableFuture<Unit> {
+    private fun joinChannelAndSendAsUser(userToken: String, channel: String, content: String): CompletableFuture<Message> {
         return courseApp.channelJoin(userToken, channel).thenCompose { sendToChannel(userToken, channel, content) }
     }
 
     private fun sendToChannel(userToken: String, channel: String, content: String) =
-            courseApp.channelSend(userToken, channel,
-                    messageFactory.create(MediaType.TEXT, content.toByteArray()).get())
+            messageFactory.create(MediaType.TEXT, content.toByteArray()).thenCompose { m -> courseApp.channelSend(userToken, channel, m).thenApply { m } }
+
 
     @Test
     fun `The bot accurately tracks keywords`() {
@@ -470,6 +473,35 @@ class CourseBotStaffTest {
             sendToChannel(adminToken, "#channel", "Chocolate-chip Mint").join()
             bot2.surveyResults(survey).join()
         }, equalTo(listOf()))
+
+    }
+
+    @Test
+    fun `bot can report on last message created that he saw, even after he leave the channel`() {
+        val channelName = "#channel"
+        val adminToken = courseApp.login("admin", "pass")
+                .thenCompose { token -> courseApp.channelJoin(token, channelName).thenApply { token } }
+                .join()
+        val regularUserToken = courseApp.login("ron", "123")
+                .thenCompose { token -> courseApp.channelJoin(token, channelName).thenApply { token } }
+                .join()
+        val bot1 = bots.bot("bot1")
+                .thenCompose { bot -> bot.join(channelName).thenApply { bot } }
+                .join()
+
+        val m1 = sendToChannel(adminToken, channelName, "message1").join()
+        val seenTime1 = bot1.seenTime("admin").join()
+        assertThat(m1.created, present(equalTo(seenTime1)))
+        Thread.sleep(TimeUnit.SECONDS.toMillis(2))
+        val m2 = sendToChannel(adminToken, channelName, "message2").join()
+        val seenTime2 = bot1.seenTime("admin").join()
+        assertThat(m2.created, present(equalTo(seenTime2)))
+
+        assertThat(seenTime1!!, present(lessThan(seenTime2!!)))
+        bot1.part(channelName).join()
+        val seenTime3 = bot1.seenTime("admin").join()
+        assertThat(m2.created, present(equalTo(seenTime3)))
+
 
     }
 }
