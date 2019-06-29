@@ -258,7 +258,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
                             botAndChannelMatchKeyPair(treeType, genericKey, channelName) }
                         .map {
                             (genericKey, _) ->
-                            courseBotApi.deleteCounter(genericKey.getSecond()).thenCompose {
+                            restartCounter(genericKey.getSecond()).thenCompose {
                                 courseBotApi.treeRemove(treeType, name, genericKey)
                             }
                         }.toList()
@@ -469,7 +469,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
                         0 -> name = data
                         1 -> channel = data
                         2 -> r = data
-                        3 -> m = MediaType.values()[data.toInt()]
+                        3 -> m = MediaType.valueOf(data)
                         else -> throw e
                     }
                 }
