@@ -244,7 +244,8 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
                 .thenCompose {
                     courseBotApi.treeGet(surveyTreeType, bot.name)
                             .thenCompose {
-                                it.mapComposeList { sid ->
+                                it.mapComposeList { key ->
+                                    val sid = SurveiesTreeKey.buildFromString(key).surveyId
                                     SurveyClient.initializeSurveyStatisticsInChannel(sid.toLong(), bot.name, channelName, courseBotApi)
                                 }
                             }

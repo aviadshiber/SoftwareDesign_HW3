@@ -67,6 +67,7 @@ class SurveyClient constructor(surveyId: Long, private val botName: String, priv
                 .mapComposeIndexList { index, answer ->
                     answersTree.treeInsert(SurveyModel.LIST_ANSWERS, id, GenericKeyPair(index.toLong(), answer))
                 }.thenApply { noAnswers = answers.size.toLong() }
+                .thenCompose { initAnswersCounters() }
                 .thenApply { this }
     }
 
@@ -87,8 +88,9 @@ class SurveyClient constructor(surveyId: Long, private val botName: String, priv
 
     fun initAnswersCounters(): CompletableFuture<SurveyClient> {
         return (0 until noAnswers).toList().mapComposeIndexList { ansIndex, _ ->
-            val counterId = createCounterId(ansIndex.toLong())
-            botApi.updateCounter(counterId, 0L)
+//            val counterId = createCounterId(ansIndex.toLong())
+//            botApi.updateCounter(counterId, 0L)
+            restartVoteCounter(ansIndex.toLong())
         }.thenApply { this }
     }
 
@@ -97,7 +99,7 @@ class SurveyClient constructor(surveyId: Long, private val botName: String, priv
                 .thenCompose {
                     it.mapComposeList { u ->
                         val voteId = createVoteId(u)
-                        botApi.deleteVoteAnswer(voteId)
+                        botApi.updateVoteAnswer(voteId, 0)
                     }
                 }.thenCompose { usersTree.treeClean(SurveyModel.LIST_S_USERS, id) }
                 .thenApply { this }
@@ -149,6 +151,14 @@ class SurveyClient constructor(surveyId: Long, private val botName: String, priv
             if (prevCounter == null) botApi.createCounter(counterId).thenCompose { botApi.updateCounter(counterId, number) }
                     .thenApply { 0L }
             else botApi.updateCounter(counterId, prevCounter.value + number).thenApply { prevCounter.value }
+        }
+    }
+
+    private fun restartVoteCounter(index: Long): CompletableFuture<Unit> {
+        val counterId = createCounterId(index)
+        return botApi.findCounter(counterId).thenCompose<Unit> { prevCounter ->
+            if (prevCounter == null) botApi.createCounter(counterId).thenCompose { botApi.updateCounter(counterId, 0L) }.thenApply {  }
+            else botApi.updateCounter(counterId, 0L).thenApply {  }
         }
     }
 }
