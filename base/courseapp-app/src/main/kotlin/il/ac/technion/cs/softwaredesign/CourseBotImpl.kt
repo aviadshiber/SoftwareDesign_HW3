@@ -315,7 +315,12 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
      */
     private fun incCounterValue(counterId: String): CompletableFuture<Counter> {
         return courseBotApi.findCounter(counterId)
-                .thenCompose { counter -> courseBotApi.updateCounter(counterId, counter!!.value + 1L) }
+                .thenCompose {
+                    counter ->
+                    if (counter == null) courseBotApi.createCounter(counterId)
+                            .thenCompose { courseBotApi.updateCounter(counterId, 1L) }
+                    else courseBotApi.updateCounter(counterId, counter.value + 1L)
+                }
     }
 
     override fun count(channel: String?, regex: String?, mediaType: MediaType?): CompletableFuture<Long> {
