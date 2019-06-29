@@ -120,11 +120,10 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
     }
 
     fun loadAllBotListeners(): CompletableFuture<Unit> {
-        // TODO: add callbacks: MostActive + LastSeen
         val primitiveCallbacks = getChannelNames()
                 .thenCompose { channelNames ->
                     channelNames.mapComposeList { channelName ->
-                        courseApp.addListener(bot.token, buildLastSeenMsgCallback(channelName))
+                        courseApp.addListener(bot.token, buildLastSeenMsgCallback(channelName)) // TODO: fix LastSeen callbacks
                                 .thenCompose { courseApp.addListener(bot.token, buildMostActiveUserCallback(channelName)) }
                     }
                 }
