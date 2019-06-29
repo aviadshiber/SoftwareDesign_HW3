@@ -286,14 +286,14 @@ class CourseBotStaffTest {
                 .thenCompose { adminToken ->
                     courseApp.channelJoin(adminToken, "#channel")
                             .thenCompose { bots.bot().thenCompose { it.join("#channel") } }
-                            .thenCompose { bots.bot().thenCompose { it.join("#channel") } }
+                            .thenCompose { bots.bot("ronBot").thenCompose { it.join("#channel") } }
                             .thenCompose { bots.bot().thenCompose { it.join("#channel") } }
                             .thenCompose { bots.bot().thenCompose { it.join("#channel") } }
                 }.join()
 
         assertThat(runWithTimeout(ofSeconds(10)) {
             bots.bots("#channel").join()
-        }, equalTo(listOf("Anna0", "Anna1", "Anna2", "Anna3")))
+        }, equalTo(listOf("Anna0", "ronBot", "Anna2", "Anna3")))
     }
 
     @Test
@@ -398,5 +398,35 @@ class CourseBotStaffTest {
             courseApp.channelSend(adminToken, "#channel", messageFactory.create(MediaType.TEXT, "Chocolate-chip Mint".toByteArray()).join()).join()
             bot.surveyResults(survey).join()
         }, containsElementsInOrder(0L, 0L, 2L))
+    }
+
+    @Test
+    fun `A user in the channel can override his answer, and cannot vote more than once`() {
+        val adminToken = courseApp.login("gal", "hunter2")
+                .thenCompose { token -> courseApp.channelJoin(token, "#channel").thenApply { token } }
+                .join()
+        val regularUserToken = courseApp.login("matan", "s3kr3t")
+                .thenCompose { token -> courseApp.channelJoin(token, "#channel").thenApply { token } }
+                .join()
+        val bot = bots.bot()
+                .thenCompose { bot -> bot.join("#channel").thenApply { bot } }
+                .join()
+        val survey = bot.runSurvey("#channel", "What is your favorite flavour of ice-cream?",
+                listOf("Cranberry",
+                        "Charcoal",
+                        "Chocolate-chip Mint")).join()
+        assertThat(runWithTimeout(ofSeconds(10)) {
+            sendToChannel(adminToken, "#channel", "Chocolate-chip Mint").join()
+            sendToChannel(regularUserToken, "#channel", "Chocolate-chip Mint").join()
+            sendToChannel(adminToken, "#channel", "Chocolate-chip Mint").join()
+            bot.surveyResults(survey).join()
+        }, containsElementsInOrder(0L, 0L, 2L))
+
+        assertThat(runWithTimeout(ofSeconds(10)) {
+            sendToChannel(adminToken, "#channel", "Cranberry").join()
+            bot.surveyResults(survey).join()
+        }, containsElementsInOrder(1L, 0L, 1L))
+
+
     }
 }
