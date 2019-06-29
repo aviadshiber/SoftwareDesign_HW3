@@ -426,7 +426,25 @@ class CourseBotStaffTest {
             sendToChannel(adminToken, "#channel", "Cranberry").join()
             bot.surveyResults(survey).join()
         }, containsElementsInOrder(1L, 0L, 1L))
+    }
 
+    @Test
+    fun `requesting results from unExisting survey result in empty list`() {
+        val adminToken = courseApp.login("gal", "hunter2")
+                .thenCompose { token -> courseApp.channelJoin(token, "#channel").thenApply { token } }
+                .join()
+        val regularUserToken = courseApp.login("matan", "s3kr3t")
+                .thenCompose { token -> courseApp.channelJoin(token, "#channel").thenApply { token } }
+                .join()
+        val bot = bots.bot()
+                .thenCompose { bot -> bot.join("#channel").thenApply { bot } }
+                .join()
+        val survey = bot.runSurvey("#channel", "What is your favorite flavour of ice-cream?",
+                listOf("Cranberry",
+                        "Charcoal",
+                        "Chocolate-chip Mint")).join()
+        val results = bot.surveyResults("notExisting").join()
+        assertThat(results, equalTo(listOf()))
 
     }
 }
