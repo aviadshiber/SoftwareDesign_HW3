@@ -236,6 +236,11 @@ class CourseBotMikiTests {
             val callback: ListenerCallback = mockk(relaxed = true)
             val msg = slot<Message>()
             every {
+                callback(any(), any())
+            } answers {
+                CompletableFuture.completedFuture(Unit)
+            }
+            every {
                 callback("#math@MathProfessor", capture(msg))
             } answers {
                 CompletableFuture.completedFuture(Unit)
@@ -265,6 +270,11 @@ class CourseBotMikiTests {
 
             val callback: ListenerCallback = mockk(relaxed = true)
             val msg = slot<Message>()
+            every {
+                callback(any(), any())
+            } answers {
+                CompletableFuture.completedFuture(Unit)
+            }
             every {
                 callback("#math@MathProfessor", capture(msg))
             } answers {
@@ -300,6 +310,11 @@ class CourseBotMikiTests {
 
             val callback: ListenerCallback = mockk(relaxed = true)
             val msg = slot<Message>()
+            every {
+                callback(any(), any())
+            } answers {
+                CompletableFuture.completedFuture(Unit)
+            }
             every {
                 callback("#math@MathProfessor", capture(msg))
             } answers {
