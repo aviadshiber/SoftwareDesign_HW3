@@ -2,6 +2,7 @@ package il.ac.technion.cs.softwaredesign.tests.others.vlad
 
 import com.natpryce.hamkrest.assertion.assertThat
 import com.natpryce.hamkrest.equalTo
+import il.ac.technion.cs.softwaredesign.tests.containsElementsInOrder
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 
@@ -63,6 +64,39 @@ open class CourseBotsTest : CourseTest() {
                 .join()
         reboot()
         assertThat(bots.bots(channelName).join(), equalTo(listOf("y", "x")))
+    }
+
+    @Test
+    fun `channels does not contain the channel where bot was kicked from`() {
+        val channelName = "#ar"
+
+        courseApp.channelJoin(adminToken, channelName)
+                .thenCompose { bots.bot() }
+                .thenCompose { bot -> bot.join(channelName) }
+                .thenCompose { courseApp.channelKick(adminToken, channelName, "Anna0") }
+                .join()
+
+        assertThat(bots.bot("Anna0").thenCompose { bot -> bot.channels() }.join(), equalTo(listOf()))
+    }
+
+    @Test
+    fun `join join kick join is ok`() {
+        val channelName1 = "#1"
+        val channelName2 = "#2"
+
+        val bot = courseApp.channelJoin(adminToken, channelName1)
+                .thenCompose { courseApp.channelJoin(adminToken, channelName2) }
+                .thenCompose { bots.bot() }
+                .thenCompose { bot ->
+                    bot.join(channelName1)
+                            .thenCompose { bot.join(channelName2) }
+                            .thenCompose { courseApp.channelKick(adminToken, channelName1, "Anna0") }
+                            .thenCompose { bot.join(channelName1) }
+                            .thenApply { bot }
+                }
+                .join()
+
+        assertThat(bot.channels().join(), containsElementsInOrder(channelName2, channelName1))
     }
 
 }

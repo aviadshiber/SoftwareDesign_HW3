@@ -14,7 +14,7 @@ import java.util.logging.Level
 import java.util.logging.Logger
 
 open class CourseTest {
-    protected val injector: Injector = Guice.createInjector(CourseBotModule(), TestModule())
+    protected val injector: Injector = Guice.createInjector(CourseAppModule(), CourseBotModule(), TestModule())
 
     init {
         injector.getInstance<CourseAppInitializer>().setup().join()
@@ -43,7 +43,7 @@ open class CourseTest {
     protected fun doReboot() {
         val courseAppBefore: CourseApp = courseApp
         bots.bots().join()
-        val injector: Injector = Guice.createInjector(CourseBotModule(), TestModule())
+        val injector: Injector = Guice.createInjector(CourseAppModule(), CourseBotModule(), TestModule())
         courseApp = injector.getInstance()
         (courseApp as FakeCourseApp).restore(courseAppBefore as FakeCourseApp)
         bots = injector.getInstance()

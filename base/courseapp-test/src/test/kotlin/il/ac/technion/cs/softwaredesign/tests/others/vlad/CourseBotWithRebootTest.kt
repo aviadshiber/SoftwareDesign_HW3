@@ -48,7 +48,7 @@ class CourseBotWithRebootTest : CourseBotTest() {
             courseApp.channelJoin(adminToken, channel).join()
             val token = loginAndJoin("user", channel)
             bot.join(channel).join()
-            bot.setTipTrigger(trigger)
+            bot.setTipTrigger(trigger).join()
             tip(token, 42L, "admin", channel, trigger)
             reboot()
             tip(adminToken, 43L, "user", channel, trigger)
