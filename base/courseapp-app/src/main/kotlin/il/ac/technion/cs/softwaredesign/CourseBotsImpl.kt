@@ -51,9 +51,15 @@ class CourseBotsImpl @Inject constructor(private val courseApp: CourseApp,
         return generateBotId().thenApply { chooseBotName(name, it) }
                 .thenCompose { (id, botName) -> loginBotIfNotExistFuture(botName, id) }
                 .thenCompose { (token, id, botName) -> courseBotApi.findBot(botName)
-                        .thenCompose { if (it == null) courseBotApi.createBot(id, botName, token) else ImmediateFuture { it } }
+                        .thenCompose {
+                            if (it == null)
+                                courseBotApi.createBot(id, botName, token)
+                                        .thenCompose { bot ->
+                                            botTreeWrapper.treeInsert(BotsModel.ALL_BOTS, botsTreeName, GenericKeyPair(bot!!.botId, bot.botName)).thenApply { bot }
+                                        }
+                            else ImmediateFuture { it } }
                 }
-                .thenCompose { bot -> botTreeWrapper.treeInsert(BotsModel.ALL_BOTS, botsTreeName, GenericKeyPair(bot!!.botId, bot.botName)).thenApply { bot } }
+//                .thenCompose { bot -> botTreeWrapper.treeInsert(BotsModel.ALL_BOTS, botsTreeName, GenericKeyPair(bot!!.botId, bot.botName)).thenApply { bot } }
                 .thenApply { bot -> CourseBotImpl(Bot(bot!!.botId, bot.botToken, bot.botName, courseBotApi), courseApp, messageFactory, courseBotApi) }
     }
 
