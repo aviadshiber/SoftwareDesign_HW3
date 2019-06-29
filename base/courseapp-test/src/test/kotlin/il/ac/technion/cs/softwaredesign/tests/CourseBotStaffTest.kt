@@ -430,21 +430,46 @@ class CourseBotStaffTest {
 
     @Test
     fun `requesting results from unExisting survey result in empty list`() {
+        courseApp.login("gal", "hunter2")
+                .thenCompose { token -> courseApp.channelJoin(token, "#channel").thenApply { token } }
+                .join()
+        val bot = bots.bot()
+                .thenCompose { bot -> bot.join("#channel").thenApply { bot } }
+                .join()
+        bot.runSurvey("#channel", "What is your favorite flavour of ice-cream?",
+                listOf("Cranberry",
+                        "Charcoal",
+                        "Chocolate-chip Mint")).join()
+        val results = bot.surveyResults("notExisting").join()
+        assertThat(results, equalTo(listOf()))
+
+    }
+
+    @Test
+    fun `requesting results of survey from the wrong bot results in empty list`() {
         val adminToken = courseApp.login("gal", "hunter2")
                 .thenCompose { token -> courseApp.channelJoin(token, "#channel").thenApply { token } }
                 .join()
         val regularUserToken = courseApp.login("matan", "s3kr3t")
                 .thenCompose { token -> courseApp.channelJoin(token, "#channel").thenApply { token } }
                 .join()
-        val bot = bots.bot()
+        val bot1 = bots.bot("bot1")
                 .thenCompose { bot -> bot.join("#channel").thenApply { bot } }
                 .join()
-        val survey = bot.runSurvey("#channel", "What is your favorite flavour of ice-cream?",
+        val bot2 = bots.bot("bot2")
+                .thenCompose { bot -> bot.join("#channel").thenApply { bot } }
+                .join()
+        val survey = bot1.runSurvey("#channel", "What is your favorite flavour of ice-cream?",
                 listOf("Cranberry",
                         "Charcoal",
                         "Chocolate-chip Mint")).join()
-        val results = bot.surveyResults("notExisting").join()
-        assertThat(results, equalTo(listOf()))
+
+        assertThat(runWithTimeout(ofSeconds(10)) {
+            sendToChannel(adminToken, "#channel", "Chocolate-chip Mint").join()
+            sendToChannel(regularUserToken, "#channel", "Chocolate-chip Mint").join()
+            sendToChannel(adminToken, "#channel", "Chocolate-chip Mint").join()
+            bot2.surveyResults(survey).join()
+        }, equalTo(listOf()))
 
     }
 }
