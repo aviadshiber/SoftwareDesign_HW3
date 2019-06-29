@@ -40,7 +40,6 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
         const val KEY_LAST_CHANNEL_ID = "lastChannelId"
         const val KEY_LAST_SURVEY_ID = "lastChannelId"
         private const val msgCounterTreeType = "msgCounter"
-        private const val userActivityCounterTreeType = "userMsgCounter"
         private const val surveyTreeType = "surveyTreeType"
         private const val lastSeenTreeType="lastSeenTreeType"
         fun combineArgsToString(vararg values: Any?): String =
@@ -272,13 +271,11 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
         val extractedChannelName =
                 when (treeType) {
                     msgCounterTreeType -> MessageCounterTreeKey.buildFromString(genericKey.getSecond()).channelName
-                    userActivityCounterTreeType -> MostActiveUserTreeKey.buildFromString(genericKey.getSecond()).channelName
                     else -> throw UnsupportedOperationException()
                 }
         val extractedBotName =
                 when (treeType) {
                     msgCounterTreeType -> MessageCounterTreeKey.buildFromString(genericKey.getSecond()).botName
-                    userActivityCounterTreeType -> MostActiveUserTreeKey.buildFromString(genericKey.getSecond()).botName
                     else -> throw UnsupportedOperationException()
                 }
 

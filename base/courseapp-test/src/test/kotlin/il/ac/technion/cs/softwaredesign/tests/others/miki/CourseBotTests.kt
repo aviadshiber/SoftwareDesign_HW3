@@ -1,4 +1,4 @@
-package il.ac.technion.cs.softwaredesign.tests
+package il.ac.technion.cs.softwaredesign.tests.others.miki
 
 import com.authzee.kotlinguice4.getInstance
 import com.google.inject.Guice
@@ -11,6 +11,9 @@ import il.ac.technion.cs.softwaredesign.lib.utils.thenForward
 import il.ac.technion.cs.softwaredesign.messages.MediaType
 import il.ac.technion.cs.softwaredesign.messages.Message
 import il.ac.technion.cs.softwaredesign.messages.MessageFactory
+import il.ac.technion.cs.softwaredesign.tests.TestModule
+import il.ac.technion.cs.softwaredesign.tests.joinException
+import il.ac.technion.cs.softwaredesign.tests.randomChannelName
 import io.mockk.*
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -48,20 +51,20 @@ class CourseBotMikiTests {
         }
 
         @Test
-        fun `throws UserNotAuthorizedException if the channel cant be joined or parted`() {
+        fun `throws NoSuchEntityException if the channel cant be joined or parted`() {
 
             val channel = "#channel"
             val botName = "John"
 
             // Cant part a non-joined channel
-            assertThrows<UserNotAuthorizedException> {
+            assertThrows<NoSuchEntityException> {
                 bots.bot(botName)
                         .thenCompose { bot -> bot.part(channel) }
                         .joinException()
             }
 
             // Can't part a non-existing channel
-            assertThrows<UserNotAuthorizedException> {
+            assertThrows<NoSuchEntityException> {
                 bots.bot(botName)
                         .thenCompose { bot -> bot.join(channel).thenApply { bot } }
                         .thenCompose { bot -> bot.part("illegal") }
@@ -69,7 +72,7 @@ class CourseBotMikiTests {
             }
 
             // Can't part an already parted channel
-            assertThrows<UserNotAuthorizedException> {
+            assertThrows<NoSuchEntityException> {
                 bots.bot(botName)
                         .thenCompose { bot ->
                             bot.join(channel)
