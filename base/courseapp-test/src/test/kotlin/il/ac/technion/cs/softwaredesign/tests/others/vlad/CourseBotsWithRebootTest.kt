@@ -1,4 +1,4 @@
-package il.ac.technion.cs.softwaredesign.tests
+package il.ac.technion.cs.softwaredesign.tests.others.vlad
 
 import org.junit.jupiter.api.TestInstance
 
