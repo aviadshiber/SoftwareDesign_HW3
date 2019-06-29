@@ -140,8 +140,9 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
     }
 
     private fun removeChannelListeners(keyPrefix: String, channelName: String): CompletableFuture<Unit> {
-        val callbacks = callbacksMap[combineArgsToString(keyPrefix, channelName)]!!
-        return callbacks.mapComposeList { callback -> courseApp.removeListener(bot.token, callback) }
+        val callbacks = callbacksMap[combineArgsToString(keyPrefix, channelName)]
+        return if (callbacks == null) ImmediateFuture { }
+        else callbacks.mapComposeList { callback -> courseApp.removeListener(bot.token, callback) }
     }
 
     fun loadAllBotListeners(): CompletableFuture<Unit> {
