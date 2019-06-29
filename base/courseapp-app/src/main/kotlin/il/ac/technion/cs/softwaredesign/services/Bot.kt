@@ -43,24 +43,4 @@ data class Bot constructor(val id: Long, val token: String, val name: String, pr
             botApi.updateBot(name, Pair(BotModel.KEY_BOT_TIP_TRIGGER, valueToWrite)).thenApply { }.join()
         }
 
-    var mostActiveUser: String?
-        get() {
-            return botApi.findBot(name).thenApply { it!!.mostActiveUser }
-                    .thenApply { if (it == invalid_value) null else it }.join()
-        }
-        set(value) {
-            val valueToWrite = value ?: invalid_value
-            botApi.updateBot(name, Pair(BotModel.KEY_BOT_MOST_ACTIVE_USER, valueToWrite)).thenApply { }.join()
-        }
-
-    var mostActiveUserCount: Long?
-        get() {
-            return botApi.findBot(name).thenApply { it!!.mostActiveUserCount }
-                    .thenApply { if (it == -1L) null else it }.join()
-        }
-        set(value) {
-            val valueToWrite = value ?: -1L
-            botApi.updateBot(name, Pair(BotModel.KEY_BOT_MOST_ACTIVE_USER_COUNT, valueToWrite)).thenApply { }.join()
-        }
-
 }

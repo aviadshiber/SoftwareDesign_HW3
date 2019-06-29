@@ -16,10 +16,7 @@ import il.ac.technion.cs.softwaredesign.messages.Message
 import il.ac.technion.cs.softwaredesign.messages.MessageFactory
 import il.ac.technion.cs.softwaredesign.models.BotModel
 import il.ac.technion.cs.softwaredesign.models.BotsModel
-import il.ac.technion.cs.softwaredesign.services.Bot
-import il.ac.technion.cs.softwaredesign.services.CashBalance
-import il.ac.technion.cs.softwaredesign.services.CourseBotApi
-import il.ac.technion.cs.softwaredesign.services.SurveyClient
+import il.ac.technion.cs.softwaredesign.services.*
 import il.ac.technion.cs.softwaredesign.trees.TreeWrapper
 import il.ac.technion.cs.softwaredesign.utils.convertToLocalDateTime
 import il.ac.technion.cs.softwaredesign.utils.convertToString
@@ -129,11 +126,11 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
         val primitiveCallbacks = getChannelNames()
                 .thenCompose { channelNames ->
                     channelNames.mapComposeList { channelName ->
-                        courseApp.addListener(bot.token, buildLastSeenMsgCallback(channelName))
+                        courseApp.addListener(bot.token, buildLastSeenMsgCallback(channelName)) // TODO: fix LastSeen callbacks
                                 .thenCompose { courseApp.addListener(bot.token, buildMostActiveUserCallback(channelName)) }
                     }
                 }
-        val messagesCallbacks = courseBotApi.treeGet(userActivityCounterTreeType, bot.name)
+        val messagesCallbacks = courseBotApi.treeGet(msgCounterTreeType, bot.name)
                 .thenCompose<Unit> { keys ->
                     keys.filter { key ->
                         MessageCounterTreeKey.buildFromString(key).botName == bot.name
@@ -165,22 +162,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
                     val sender = source.sender
                     if (sender.isEmpty()) ImmediateFuture { Unit }
                     else {
-                        val key = MostActiveUserTreeKey(bot.name, channelName, sender).build()
-                        courseBotApi.treeContains(userActivityCounterTreeType, bot.name, GenericKeyPair(0L, key))
-                                .thenCompose {
-                                    courseBotApi.treeInsert(userActivityCounterTreeType, bot.name, GenericKeyPair(0L, key))
-                                }
-                                .thenCompose {
-                                    incCounterValue(key)
-                                }
-                                .thenApply { userCounter ->
-                                    val currMax = bot.mostActiveUserCount ?: -1L
-                                    val maxCount = max(currMax, userCounter.value)
-                                    if (maxCount > currMax) {
-                                        bot.mostActiveUser = sender
-                                        bot.mostActiveUserCount = maxCount
-                                    }
-                                }
+                        MostActiveUsers(channelName, bot.name, courseBotApi).updateSentMsgByUser(sender)
                     }
                 }
             }
@@ -258,7 +240,6 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
 
     private fun cleanAllBotStatisticsOnChannel(channelName: String): CompletableFuture<Unit> {
         return invalidateCounter(channelName, msgCounterTreeType, bot.name)
-                .thenCompose { invalidateCounter(channelName, userActivityCounterTreeType, bot.name) }
                 .thenCompose { CashBalance(channelName, bot.name, courseBotApi).cleanData() }
                 .thenCompose {
                     courseBotApi.treeGet(surveyTreeType, bot.name)
@@ -278,7 +259,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
                             botAndChannelMatchKeyPair(treeType, genericKey, channelName) }
                         .map {
                             (genericKey, _) ->
-                            courseBotApi.deleteCounter(genericKey.getSecond()).thenCompose {
+                            restartCounter(genericKey.getSecond()).thenCompose {
                                 courseBotApi.treeRemove(treeType, name, genericKey)
                             }
                         }.toList()
@@ -335,7 +316,12 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
      */
     private fun incCounterValue(counterId: String): CompletableFuture<Counter> {
         return courseBotApi.findCounter(counterId)
-                .thenCompose { counter -> courseBotApi.updateCounter(counterId, counter!!.value + 1L) }
+                .thenCompose {
+                    counter ->
+                    if (counter == null) courseBotApi.createCounter(counterId)
+                            .thenCompose { courseBotApi.updateCounter(counterId, 1L) }
+                    else courseBotApi.updateCounter(counterId, counter.value + 1L)
+                }
     }
 
     override fun count(channel: String?, regex: String?, mediaType: MediaType?): CompletableFuture<Long> {
@@ -397,7 +383,9 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
     }
 
     override fun mostActiveUser(channel: String): CompletableFuture<String?> {
-        return validateBotInChannel(channel).thenApply { bot.mostActiveUser }
+        return validateBotInChannel(channel).thenCompose {
+            MostActiveUsers(channel, bot.name, courseBotApi).getMostActiveUserInChannel()
+        }
     }
 
     override fun richestUser(channel: String): CompletableFuture<String?> {
@@ -490,7 +478,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
                         0 -> name = data
                         1 -> channel = data
                         2 -> r = data
-                        3 -> m = MediaType.values()[data.toInt()]
+                        3 -> m = MediaType.valueOf(data)
                         else -> throw e
                     }
                 }

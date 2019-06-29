@@ -1,4 +1,4 @@
-package il.ac.technion.cs.softwaredesign.tests
+package il.ac.technion.cs.softwaredesign.tests.others.ron
 
 
 import com.authzee.kotlinguice4.getInstance
@@ -7,6 +7,8 @@ import il.ac.technion.cs.softwaredesign.*
 import il.ac.technion.cs.softwaredesign.exceptions.NoSuchEntityException
 import il.ac.technion.cs.softwaredesign.messages.MediaType
 import il.ac.technion.cs.softwaredesign.messages.MessageFactory
+import il.ac.technion.cs.softwaredesign.tests.TestModule
+import il.ac.technion.cs.softwaredesign.tests.joinException
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.Test
@@ -93,7 +95,7 @@ class CourseBotTests {
         bot.join("#channel").join()
         bot.part("#channel").join()
 
-        assertThrows<NoSuchEntityException> { bot.part("#channel").join() }
+        assertThrows<NoSuchEntityException> { bot.part("#channel").joinException() }
     }
 
     @Test
@@ -249,7 +251,7 @@ class CourseBotTests {
         val bot = bots.bot().join()
         bot.join(channel).join()
 
-        assertThrows<IllegalArgumentException> { bot.beginCount(channel).join() }
+        assertThrows<IllegalArgumentException> { bot.beginCount(channel).joinException() }
     }
 
     @Test
@@ -465,8 +467,8 @@ class CourseBotTests {
         courseApp.channelJoin(otherToken, "#channel").join()
         courseApp.channelSend(otherToken, "#channel", messageFactory.create(MediaType.TEXT, "tip 10 gal".toByteArray()).join())
 
-        assertThrows<NoSuchEntityException> { bot.richestUser("channel2") }
-        assertThrows<NoSuchEntityException> { bot.richestUser("notExistChannel") }
+        assertThrows<NoSuchEntityException> { bot.richestUser("channel2").joinException() }
+        assertThrows<NoSuchEntityException> { bot.richestUser("notExistChannel").joinException() }
     }
 
 
@@ -505,8 +507,8 @@ class CourseBotTests {
         courseApp.channelJoin(otherToken, "#channel").join()
         // courseApp.channelSend(otherToken, "#channel", messageFactory.create(MediaType.TEXT, "tip 10 gal".toByteArray()).join())
 
-        assertThrows<NoSuchEntityException> { bot.mostActiveUser("#channel2") }
-        assertThrows<NoSuchEntityException> { bot.mostActiveUser("#notExistChannel") }
+        assertThrows<NoSuchEntityException> { bot.mostActiveUser("#channel2").joinException() }
+        assertThrows<NoSuchEntityException> { bot.mostActiveUser("#notExistChannel").joinException() }
 
     }
 
@@ -643,14 +645,14 @@ class CourseBotTests {
             bot.runSurvey("#channel2", "What is your favorite flavour of ice-cream?",
                     listOf("Cranberry",
                             "Charcoal",
-                            "Chocolate-chip Mint")).join()
+                            "Chocolate-chip Mint")).joinException()
 
         }
         assertThrows<NoSuchEntityException> {
             bot.runSurvey("#notExist", "What is your favorite flavour of ice-cream?",
                     listOf("Cranberry",
                             "Charcoal",
-                            "Chocolate-chip Mint")).join()
+                            "Chocolate-chip Mint")).joinException()
 
         }
     }
@@ -671,10 +673,8 @@ class CourseBotTests {
                         "Charcoal",
                         "Chocolate-chip Mint")).join()
 
-
-
         assertThrows<NoSuchEntityException> {
-            bot.surveyResults("wrong$survey").join()
+            bot.surveyResults("wrong$survey").joinException()
 
         }
     }
