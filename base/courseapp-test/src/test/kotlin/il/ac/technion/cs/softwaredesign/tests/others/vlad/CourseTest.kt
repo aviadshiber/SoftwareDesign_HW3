@@ -42,7 +42,7 @@ open class CourseTest {
 
     protected fun doReboot() {
         val courseAppBefore: CourseApp = courseApp
-        bots.bots()
+        bots.bots().join()
         val injector: Injector = Guice.createInjector(CourseBotModule(), TestModule())
         courseApp = injector.getInstance()
         (courseApp as FakeCourseApp).restore(courseAppBefore as FakeCourseApp)
