@@ -330,21 +330,22 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
 
     }
 
+    private fun createAction(regex: Regex) = { source: String, message: Message ->
+        val content = String(message.contents)
+        val (expression) = regex.find(content)!!.destructured
+        val solution: Int
+        try {
+            solution = Value(expression).resolve().toInt()
+            val messageFuture = messageFactory.create(MediaType.TEXT, "$solution".toByteArray(Charsets.UTF_8))
+            messageFuture.thenCompose { courseApp.channelSend(bot.token, source.channelName, it) }
+        } catch (e: Exception) {
+            ImmediateFuture { }
+        }
+    }
+
     override fun setCalculationTrigger(trigger: String?): CompletableFuture<String?> {
         val regex = calculationTriggerRegex(trigger)
-        return setCallBackForTrigger(Bot::calculationTrigger, trigger, regex) { source: String, message: Message ->
-            val content = String(message.contents)
-            val (expression) = regex.find(content)!!.destructured
-            var solution: Int
-            try {
-                solution = Value(expression).resolve().toInt()
-                val messageFuture = messageFactory.create(MediaType.TEXT, "$solution".toByteArray(Charsets.UTF_8))
-                messageFuture.thenCompose { courseApp.channelSend(bot.token, source.channelName, it) }
-            } catch (e: Exception) {
-                ImmediateFuture { }
-            }
-
-        }
+        return setCallBackForTrigger(Bot::calculationTrigger, trigger, regex, createAction(regex))
     }
 
     private fun calculationTriggerRegex(trigger: String?) = """$trigger ([()\s\d*+-/]+)""".toRegex()
@@ -354,9 +355,13 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
             : CompletableFuture<String?> {
         val prev = prop.get(bot)
         prop.set(bot, trigger)
-        return courseApp.removeListener(bot.token, buildTriggerCallback(prev, r, action))
-                .thenCompose { courseApp.addListener(bot.token, buildTriggerCallback(trigger, r, action)).thenApply { prev } }
-
+        return if (prev != null) {
+            val prevRegex = calculationTriggerRegex(prev)
+            courseApp.removeListener(bot.token, buildTriggerCallback(prev, prevRegex, createAction(prevRegex)))
+                    .thenCompose { courseApp.addListener(bot.token, buildTriggerCallback(trigger, r, action)).thenApply { prev } }
+        } else {
+            courseApp.addListener(bot.token, buildTriggerCallback(trigger, r, action)).thenApply { prev }
+        }
     }
 
     private fun buildTriggerCallback(trigger: String?, r: Regex, action: (source: String, message: Message) -> CompletableFuture<Unit>): ListenerCallback {
