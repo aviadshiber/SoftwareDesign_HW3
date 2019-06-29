@@ -327,18 +327,18 @@ class FakeCourseApp @Inject constructor(
     }
 
     override fun channelKick(token: String, channel: String, username: String): CompletableFuture<Unit> {
-        //TODO: implement for tests
+        //does not implement fully the api, it is just for the tests
         logger.info { "channelKick(%s,%s)".format(token, channel) }
 
         return ImmediateFuture {
             logger.info { "tokenToUserName[token]=%s".format(tokenToUserName[token]) }
-            val username = tokenToUserName[token] ?: throw InvalidTokenException()
+            val adminUsername = tokenToUserName[token] ?: throw InvalidTokenException()
 
             if (!"""#[0-9A-Za-z_#]*""".toRegex().matches(channel)) {
                 throw NameFormatException()
             }
-
-            channelsUsers[channel]?.remove(username)
+            val usersInChannel = channelsUsers[channel]
+            usersInChannel?.remove(username)
         }.thenDispose()
     }
 

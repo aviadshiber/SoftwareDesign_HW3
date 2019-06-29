@@ -7,6 +7,7 @@ import com.natpryce.hamkrest.assertion.assertThat
 import com.natpryce.hamkrest.equalTo
 import com.natpryce.hamkrest.present
 import il.ac.technion.cs.softwaredesign.*
+import il.ac.technion.cs.softwaredesign.exceptions.NoSuchEntityException
 import il.ac.technion.cs.softwaredesign.exceptions.UserNotAuthorizedException
 import il.ac.technion.cs.softwaredesign.messages.MediaType
 import il.ac.technion.cs.softwaredesign.messages.MessageFactory
@@ -48,22 +49,16 @@ class CourseBotStaffTest {
         }
     }
 
-    /*@Test
+    @Test
     fun `bot cannot do action on a a channel after he was kicked`(){
         val channelName="#channel"
         val adminToken=courseApp.login("aviad", "hunter2").thenCompose { adminToken -> courseApp.channelJoin(adminToken, channelName).thenApply { adminToken } }.join()
         val bot=bots.bot("mybot").thenCompose { bot -> bot.join(channelName).thenApply { bot }}.join()
         courseApp.channelKick(adminToken,channelName,"mybot")
-        assertThrows<UserNotAuthorizedException>{
-            runWithTimeout(ofSeconds(10)) {
-                bot.mostActiveUser(channelName).joinException()
-                bot.richestUser(channelName).joinException()
-                bot.beginCount(channelName,"",null).joinException()
-                bot.count(channelName,"",null).joinException()
-                bot.runSurvey(channelName,"what?!", listOf()).joinException()
-            }
-        }
-    }*/
+        assertThrows<NoSuchEntityException> { runWithTimeout(ofSeconds(10)) { bot.mostActiveUser(channelName).joinException() } }
+        assertThrows<NoSuchEntityException> { runWithTimeout(ofSeconds(10)) { bot.richestUser(channelName).joinException() } }
+        assertThrows<NoSuchEntityException> { runWithTimeout(ofSeconds(10)) { bot.runSurvey(channelName, "why they torches us?!", listOf("because they can")).joinException() } }
+    }
 
     @Test
     fun `bot cash tracks get reset after bot leave channel`() {
@@ -225,16 +220,19 @@ class CourseBotStaffTest {
     }
 
     @Test
-    fun `Can list bots in a channel`() {
-        courseApp.login("gal", "hunter2")
+    fun `Can list bots in a channel in creation order`() {
+        courseApp.login("aviad", "shiber")
                 .thenCompose { adminToken ->
                     courseApp.channelJoin(adminToken, "#channel")
+                            .thenCompose { bots.bot().thenCompose { it.join("#channel") } }
+                            .thenCompose { bots.bot().thenCompose { it.join("#channel") } }
+                            .thenCompose { bots.bot().thenCompose { it.join("#channel") } }
                             .thenCompose { bots.bot().thenCompose { it.join("#channel") } }
                 }.join()
 
         assertThat(runWithTimeout(ofSeconds(10)) {
             bots.bots("#channel").join()
-        }, equalTo(listOf("Anna0")))
+        }, equalTo(listOf("Anna0", "Anna1", "Anna2", "Anna3")))
     }
 
     @Test
@@ -289,7 +287,7 @@ class CourseBotStaffTest {
         }, present(equalTo("gal")))
     }
 
-    fun joinChannelAndSendAsUser(channel: String, content: String, userToken: String): CompletableFuture<Unit> {
+    private fun joinChannelAndSendAsUser(channel: String, content: String, userToken: String): CompletableFuture<Unit> {
         return courseApp.channelJoin(userToken, channel)
                 .thenCompose { courseApp.channelSend(userToken, channel,
                         messageFactory.create(MediaType.TEXT, content.toByteArray()).get()) }

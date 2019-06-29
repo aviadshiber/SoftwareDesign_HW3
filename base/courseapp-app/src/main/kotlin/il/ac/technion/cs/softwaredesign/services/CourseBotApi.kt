@@ -3,7 +3,6 @@ package il.ac.technion.cs.softwaredesign.services
 import com.google.inject.Singleton
 import il.ac.technion.cs.softwaredesign.lib.api.model.Channel
 import il.ac.technion.cs.softwaredesign.lib.api.model.Session
-import il.ac.technion.cs.softwaredesign.lib.api.model.User
 import il.ac.technion.cs.softwaredesign.lib.api.model.UsersMetadata
 import il.ac.technion.cs.softwaredesign.lib.db.Counter
 import il.ac.technion.cs.softwaredesign.lib.db.Database
@@ -301,7 +300,7 @@ class CourseBotApi @javax.inject.Inject constructor(private val db: Database) {
     fun treeGet(type: String, name: String): CompletableFuture<List<String>> {
         return db.tree(type, name).asSequence()
                 .thenApply { seq -> seq.toList() }
-                .thenApply { lst -> lst.map { it.first.getSecond() } }
+                .thenApply { lst -> lst.map { it.first.getSecond() }.reversed() }
     }
 
     fun treeGetMax(type: String, name: String): CompletableFuture<Pair<GenericKeyPair<Long, String>, String>?> =
