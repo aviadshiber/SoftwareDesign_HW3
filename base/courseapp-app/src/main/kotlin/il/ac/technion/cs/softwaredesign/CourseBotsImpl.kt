@@ -11,6 +11,7 @@ import il.ac.technion.cs.softwaredesign.services.CourseBotApi
 import il.ac.technion.cs.softwaredesign.trees.TreeWrapper
 import il.ac.technion.cs.softwaredesign.utils.BotId
 import io.github.vjames19.futures.jdk8.ImmediateFuture
+import java.util.*
 import java.util.concurrent.CompletableFuture
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -25,6 +26,8 @@ class CourseBotsImpl @Inject constructor(private val courseApp: CourseApp,
 
     private val channelTreeWrapper: TreeWrapper = TreeWrapper(courseBotApi, "channel_")
     private val botTreeWrapper: TreeWrapper = TreeWrapper(courseBotApi, "bot_")
+
+    private val localBotsList: TreeMap<String, CourseBot> = TreeMap()
 
     companion object {
         private const val botDefaultName = "Anna"
@@ -54,12 +57,20 @@ class CourseBotsImpl @Inject constructor(private val courseApp: CourseApp,
                             if (it == null)
                                 courseBotApi.createBot(id, botName, token)
                                         .thenCompose { bot ->
-                                            botTreeWrapper.treeInsert(BotsModel.ALL_BOTS, botsTreeName, GenericKeyPair(bot!!.botId, bot.botName)).thenApply { bot }
+                                            botTreeWrapper.treeInsert(BotsModel.ALL_BOTS, botsTreeName, GenericKeyPair(bot!!.botId, bot.botName)).thenApply { Pair(bot, botName) }
                                         }
-                            else ImmediateFuture { it } }
+                            else ImmediateFuture { Pair(it, botName) } }
                 }
 //                .thenCompose { bot -> botTreeWrapper.treeInsert(BotsModel.ALL_BOTS, botsTreeName, GenericKeyPair(bot!!.botId, bot.botName)).thenApply { bot } }
-                .thenApply { bot -> CourseBotImpl(Bot(bot!!.botId, bot.botToken, bot.botName, courseBotApi), courseApp, messageFactory, courseBotApi) }
+                .thenApply { (bot, botName) ->
+                    val localBot = localBotsList[botName]
+                    if (localBot!=null) localBot
+                    else {
+                        val newLocalBot = CourseBotImpl(Bot(bot!!.botId, bot.botToken, bot.botName, courseBotApi), courseApp, messageFactory, courseBotApi)
+                        localBotsList.putIfAbsent(botName, newLocalBot)
+                        newLocalBot
+                    }
+                }
     }
 
     private fun generateCourseBotFromBotName(name: String): CompletableFuture<CourseBotImpl> {
