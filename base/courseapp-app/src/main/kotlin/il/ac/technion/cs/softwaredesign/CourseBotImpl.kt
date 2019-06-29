@@ -25,7 +25,6 @@ import io.github.vjames19.futures.jdk8.ImmediateFuture
 import io.github.vjames19.futures.jdk8.recover
 import java.time.LocalDateTime
 import java.util.concurrent.CompletableFuture
-import kotlin.math.max
 import kotlin.reflect.KMutableProperty1
 
 
@@ -42,8 +41,9 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
         private const val msgCounterTreeType = "msgCounter"
         private const val surveyTreeType = "surveyTreeType"
         private const val lastSeenTreeType="lastSeenTreeType"
+        private const val keySeperator = "~"
         fun combineArgsToString(vararg values: Any?): String =
-                values.joinToString(separator = ",") { it?.toString() ?: "" }
+                values.joinToString(separator = keySeperator) { it?.toString() ?: "" }
     }
 
     private val channelTreeWrapper: TreeWrapper = TreeWrapper(courseBotApi, "channel_")
@@ -467,7 +467,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
                 lateinit var channel: String
                 var r: String? = null
                 var m: MediaType? = null
-                val splitedString = s.split(",", limit = 5)
+                val splitedString = s.split(keySeperator, limit = 5)
                 val e = InvalidArgumentException(arrayOf("The string does not match MessageCounterTreeKey pattern"))
                 if (splitedString.size > 4) throw e
                 splitedString.forEachIndexed { i, data ->
@@ -475,7 +475,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
                         0 -> name = data
                         1 -> channel = data
                         2 -> r = data
-                        3 -> m = MediaType.valueOf(data)
+                        3 -> m = if (data.isNotEmpty()) MediaType.valueOf(data) else null
                         else -> throw e
                     }
                 }
@@ -493,7 +493,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
                 lateinit var name: String
                 lateinit var channel: String
                 lateinit var sen: String
-                val splitedString = s.split(",", limit = 3)
+                val splitedString = s.split(keySeperator, limit = 3)
                 val e = InvalidArgumentException(arrayOf("The string does not match MostActiveUserTreeKey pattern"))
                 if (splitedString.size > 3) throw e
                 splitedString.forEachIndexed { i, data ->
@@ -517,7 +517,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
             fun buildFromString(s: String): SurveiesTreeKey {
                 lateinit var name: String
                 lateinit var sid: String
-                val splitedString = s.split(",", limit = 2)
+                val splitedString = s.split(keySeperator, limit = 2)
                 val e = InvalidArgumentException(arrayOf("The string does not match SurveiesTreeKey pattern"))
                 if (splitedString.size > 2) throw e
                 splitedString.forEachIndexed { i, data ->
