@@ -12,12 +12,6 @@ class MostActiveUsers(private val channelName: String, private val botName: Stri
     // type = channelName, name = botName, keys: genericKey(msgCounter, username)
     private val userMsgCountersTree = TreeWrapper(courseBotApi, "MAUsersCounters__")
 
-    fun clearChannelActiveUsers(): CompletableFuture<MostActiveUsers> {
-        return userNamesToMsgCounters.treeClean(channelName, botName)
-                .thenCompose { userMsgCountersTree.treeClean(channelName, botName) }
-                .thenApply { this }
-    }
-
     fun updateSentMsgByUser(userName: String): CompletableFuture<Unit> {
         return incUserCounter(userName)
     }

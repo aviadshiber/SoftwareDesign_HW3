@@ -16,10 +16,7 @@ import il.ac.technion.cs.softwaredesign.messages.Message
 import il.ac.technion.cs.softwaredesign.messages.MessageFactory
 import il.ac.technion.cs.softwaredesign.models.BotModel
 import il.ac.technion.cs.softwaredesign.models.BotsModel
-import il.ac.technion.cs.softwaredesign.services.Bot
-import il.ac.technion.cs.softwaredesign.services.CashBalance
-import il.ac.technion.cs.softwaredesign.services.CourseBotApi
-import il.ac.technion.cs.softwaredesign.services.SurveyClient
+import il.ac.technion.cs.softwaredesign.services.*
 import il.ac.technion.cs.softwaredesign.trees.TreeWrapper
 import io.github.vjames19.futures.jdk8.Future
 import io.github.vjames19.futures.jdk8.ImmediateFuture
@@ -123,6 +120,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
     }
 
     fun loadAllBotListeners(): CompletableFuture<Unit> {
+        // TODO: add callbacks: MostActive + LastSeen
         val primitiveCallbacks = getChannelNames()
                 .thenCompose { channelNames ->
                     channelNames.mapComposeList { channelName ->
@@ -130,7 +128,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
                                 .thenCompose { courseApp.addListener(bot.token, buildMostActiveUserCallback(channelName)) }
                     }
                 }
-        val messagesCallbacks = courseBotApi.treeGet(userActivityCounterTreeType, bot.name)
+        val messagesCallbacks = courseBotApi.treeGet(msgCounterTreeType, bot.name)
                 .thenCompose<Unit> { keys ->
                     keys.filter { key ->
                         MessageCounterTreeKey.buildFromString(key).botName == bot.name
@@ -162,22 +160,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
                     val sender = source.sender
                     if (sender.isEmpty()) ImmediateFuture { Unit }
                     else {
-                        val key = MostActiveUserTreeKey(bot.name, channelName, sender).build()
-                        courseBotApi.treeContains(userActivityCounterTreeType, bot.name, GenericKeyPair(0L, key))
-                                .thenCompose {
-                                    courseBotApi.treeInsert(userActivityCounterTreeType, bot.name, GenericKeyPair(0L, key))
-                                }
-                                .thenCompose {
-                                    incCounterValue(key)
-                                }
-                                .thenApply { userCounter ->
-                                    val currMax = bot.mostActiveUserCount ?: -1L
-                                    val maxCount = max(currMax, userCounter.value)
-                                    if (maxCount > currMax) {
-                                        bot.mostActiveUser = sender
-                                        bot.mostActiveUserCount = maxCount
-                                    }
-                                }
+                        MostActiveUsers(channelName, bot.name, courseBotApi).updateSentMsgByUser(sender)
                     }
                 }
             }
@@ -238,7 +221,6 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
 
     private fun cleanAllBotStatisticsOnChannel(channelName: String): CompletableFuture<Unit> {
         return invalidateCounter(channelName, msgCounterTreeType, bot.name)
-                .thenCompose { invalidateCounter(channelName, userActivityCounterTreeType, bot.name) }
                 .thenCompose { CashBalance(channelName, bot.name, courseBotApi).cleanData() }
                 .thenCompose {
                     courseBotApi.treeGet(surveyTreeType, bot.name)
@@ -381,7 +363,9 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
     }
 
     override fun mostActiveUser(channel: String): CompletableFuture<String?> {
-        return validateBotInChannel(channel).thenApply { bot.mostActiveUser }
+        return validateBotInChannel(channel).thenCompose {
+            MostActiveUsers(channel, bot.name, courseBotApi).getMostActiveUserInChannel()
+        }
     }
 
     override fun richestUser(channel: String): CompletableFuture<String?> {
