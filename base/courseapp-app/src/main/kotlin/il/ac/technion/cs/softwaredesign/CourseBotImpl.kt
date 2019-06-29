@@ -21,6 +21,8 @@ import il.ac.technion.cs.softwaredesign.services.CashBalance
 import il.ac.technion.cs.softwaredesign.services.CourseBotApi
 import il.ac.technion.cs.softwaredesign.services.SurveyClient
 import il.ac.technion.cs.softwaredesign.trees.TreeWrapper
+import il.ac.technion.cs.softwaredesign.utils.convertToLocalDateTime
+import il.ac.technion.cs.softwaredesign.utils.convertToString
 import io.github.vjames19.futures.jdk8.Future
 import io.github.vjames19.futures.jdk8.ImmediateFuture
 import io.github.vjames19.futures.jdk8.recover
@@ -43,12 +45,14 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
         private const val msgCounterTreeType = "msgCounter"
         private const val userActivityCounterTreeType = "userMsgCounter"
         private const val surveyTreeType = "surveyTreeType"
+        private const val lastSeenTreeType="lastSeenTreeType"
         fun combineArgsToString(vararg values: Any?): String =
                 values.joinToString(separator = ",") { it?.toString() ?: "" }
     }
 
     private val channelTreeWrapper: TreeWrapper = TreeWrapper(courseBotApi, "channel_")
     private val botTreeWrapper: TreeWrapper = TreeWrapper(courseBotApi, "bot_")
+    private val lastSeenUserTreeWrapper: TreeWrapper = TreeWrapper(courseBotApi, "bot_")
 
 
     // TODO: 2 options: list insert will get id.toString() or channel name
@@ -109,8 +113,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
 
     private fun isChannelNameValid(s: String) = channelNameRule matches s.channelName
 
-    private fun isNewMessageByCreationTime(message: Message) =
-            bot.lastSeenMessageTime == null || message.created > bot.lastSeenMessageTime
+    private fun isNewMessageByCreationTime(message: Message, time: LocalDateTime) = message.created > time
 
     override fun join(channelName: String): CompletableFuture<Unit> {
         return courseApp.channelJoin(bot.token, channelName)
@@ -189,10 +192,27 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
     //botNme_channel
     private fun buildLastSeenMsgCallback(channelName: String): ListenerCallback {
         return { source: String, message: Message ->
-            ImmediateFuture {
-                if (isChannelNameValid(source) && source.channelName == channelName && isNewMessageByCreationTime(message))
-                    bot.lastSeenMessageTime = message.created
-                Unit
+            if (isChannelNameValid(source) && source.channelName == channelName) {
+                val key = GenericKeyPair(0L, source.sender)
+                lastSeenUserTreeWrapper.treeSearch(lastSeenTreeType, bot.name, key).thenCompose { timeString ->
+                    updateLastSeenForNewMessageFuture(key, timeString, message)
+                }
+            }else{
+                ImmediateFuture {  }
+            }
+        }
+    }
+
+    private fun updateLastSeenForNewMessageFuture(key: GenericKeyPair<Long, String>, timeString: String?, message: Message): CompletableFuture<Unit> {
+        val messageCreatedTimeInString= message.created.convertToString()
+        return if (timeString == null) lastSeenUserTreeWrapper.treeInsert(lastSeenTreeType, bot.name, key, messageCreatedTimeInString).thenDispose()
+        else {
+
+            if (isNewMessageByCreationTime(message, timeString.convertToLocalDateTime())) {
+                lastSeenUserTreeWrapper.treeRemove(lastSeenTreeType, bot.name, key)
+                        .thenCompose { lastSeenUserTreeWrapper.treeInsert(lastSeenTreeType, bot.name, key, message.created.convertToString()) }.thenDispose()
+            } else {
+                ImmediateFuture { }
             }
         }
     }
@@ -372,7 +392,8 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
     private fun tippingRegex(trigger: String?) = """$trigger (\d+) (.*)""".toRegex()
 
     override fun seenTime(user: String): CompletableFuture<LocalDateTime?> {
-        return ImmediateFuture { bot.lastSeenMessageTime }
+        return lastSeenUserTreeWrapper.treeSearch(lastSeenTreeType,bot.name,GenericKeyPair(0L,user))
+                .thenApply {timeString-> timeString?.convertToLocalDateTime() }
     }
 
     override fun mostActiveUser(channel: String): CompletableFuture<String?> {
@@ -525,4 +546,6 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
             }
         }
     }
+
+
 }
