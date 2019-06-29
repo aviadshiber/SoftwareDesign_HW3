@@ -76,8 +76,9 @@ class CourseBotsImpl @Inject constructor(private val courseApp: CourseApp,
     private fun generateCourseBotFromBotName(name: String): CompletableFuture<CourseBotImpl> {
         return courseBotApi.findBot(name)
                 .thenApply { bot ->
-                    CourseBotImpl(Bot(bot!!.botId, bot.botToken, bot.botName, courseBotApi),
-                            courseApp, messageFactory, courseBotApi)
+                    val newLocalBot = CourseBotImpl(Bot(bot!!.botId, bot.botToken, bot.botName, courseBotApi), courseApp, messageFactory, courseBotApi)
+                    localBotsList.putIfAbsent(bot.botName, newLocalBot)
+                    newLocalBot
                 }
     }
 
