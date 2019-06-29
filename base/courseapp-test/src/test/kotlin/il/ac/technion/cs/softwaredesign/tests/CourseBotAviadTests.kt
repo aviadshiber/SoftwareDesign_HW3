@@ -445,7 +445,34 @@ class CourseBotAviadTests {
                         "Chocolate-chip Mint")).join()
 
         assertThrows<NoSuchEntityException> { runWithTimeout(ofSeconds(10)) { bot.surveyResults("notExisting").joinException() } }
+    }
 
+    @Test
+    fun `throws NoSuchEntityException if invalid token accepted`() {
+        val bot = bots.bot("Cashier").join()
+        val channel = "#shop"
+
+        val user = courseApp.login("user", "1234").join()
+        val otherUser = courseApp.login("otherUser", "1234").join()
+
+        bot.setTipTrigger("tip")
+                .thenCompose { bot.join(channel) }
+                .thenCompose { courseApp.channelJoin(user, channel) }
+                .thenCompose { courseApp.channelJoin(otherUser, channel) }
+                .thenCompose { messageFactory.create(MediaType.TEXT, "tip 1 user".toByteArray()) }
+                // user = 1001
+                // otherUser = 999
+                .thenCompose { m -> courseApp.channelSend(otherUser, channel, m) }
+                .thenCompose { messageFactory.create(MediaType.TEXT, "tip 500 otherUser".toByteArray()) }
+                // user = 501
+                // otherUser = 1499
+                .thenCompose { m -> courseApp.channelSend(user, channel, m) }
+                .thenCompose { bot.part(channel) }
+                .join()
+
+        assertThrows<NoSuchEntityException> {
+            bot.richestUser(channel+channel).joinException()
+        }
     }
 
     @Test
