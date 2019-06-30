@@ -1,6 +1,7 @@
 package il.ac.technion.cs.softwaredesign.services
 
 import il.ac.technion.cs.softwaredesign.lib.db.dal.GenericKeyPair
+import il.ac.technion.cs.softwaredesign.lib.utils.mapComposeList
 import il.ac.technion.cs.softwaredesign.trees.TreeWrapper
 import io.github.vjames19.futures.jdk8.ImmediateFuture
 import java.util.concurrent.CompletableFuture
@@ -18,6 +19,16 @@ class MostActiveUsers(private val channelName: String, private val botName: Stri
 
     fun getMostActiveUserInChannel(): CompletableFuture<String?> {
         return getTop()
+    }
+
+    fun resetCounters(): CompletableFuture<Unit> {
+        return userNamesToMsgCounters.treeGet(channelName, botName).thenCompose { users ->
+            users.mapComposeList { username ->
+                userNamesToMsgCounters.treeRemove(channelName, botName, GenericKeyPair(0L, username))
+                userNamesToMsgCounters.treeInsert(channelName, botName, GenericKeyPair(0L, username), value = (0L).toString())
+            }
+        }
+
     }
 
     private fun incUserCounter(username: String): CompletableFuture<Unit> {

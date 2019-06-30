@@ -44,12 +44,12 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
         private const val lastSeenTreeType = "lastSeenTreeType"
         private const val lastSeenCallbackPrefix = "lastSeenMessage"
         private const val mostActiveCallbackPrefix = "mostActive"
-        private const val surveyCallbackPrefix = "surveycallbacks"
+        private const val surveyCallbackPrefix = "surveyCallbacks"
         private const val countCallbackPrefix = "countCallbacks"
 
-        private const val keySeperator = "~"
+        private const val keySeparator = "~"
         fun combineArgsToString(vararg values: Any?): String =
-                values.joinToString(separator = keySeperator) { it?.toString() ?: "" }
+                values.joinToString(separator = keySeparator) { it?.toString() ?: "" }
     }
 
     private val channelTreeWrapper: TreeWrapper = TreeWrapper(courseBotApi, "channel_")
@@ -278,7 +278,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
                                 }
                             }
                     // .thenCompose { courseBotApi.treeClean(surveyTreeType, bot.name) } //we should never delete the surveys even when bot leave a channel
-                }
+                }.thenCompose { MostActiveUsers(channelName, bot.name, courseBotApi).resetCounters() }
     }
 
     private fun invalidateCounter(channelName: String?, treeType: String, name: String): CompletableFuture<Unit> {
@@ -524,7 +524,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
                 lateinit var channel: String
                 var r: String? = null
                 var m: MediaType? = null
-                val splitedString = s.split(keySeperator, limit = 5)
+                val splitedString = s.split(keySeparator, limit = 5)
                 val e = InvalidArgumentException(arrayOf("The string does not match MessageCounterTreeKey pattern"))
                 if (splitedString.size > 4) throw e
                 splitedString.forEachIndexed { i, data ->
@@ -550,7 +550,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
                 lateinit var name: String
                 lateinit var channel: String
                 lateinit var sen: String
-                val splitedString = s.split(keySeperator, limit = 3)
+                val splitedString = s.split(keySeparator, limit = 3)
                 val e = InvalidArgumentException(arrayOf("The string does not match MostActiveUserTreeKey pattern"))
                 if (splitedString.size > 3) throw e
                 splitedString.forEachIndexed { i, data ->
@@ -574,7 +574,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
             fun buildFromString(s: String): SurveiesTreeKey {
                 lateinit var name: String
                 lateinit var sid: String
-                val splitedString = s.split(keySeperator, limit = 2)
+                val splitedString = s.split(keySeparator, limit = 2)
                 val e = InvalidArgumentException(arrayOf("The string does not match SurveiesTreeKey pattern"))
                 if (splitedString.size > 2) throw e
                 splitedString.forEachIndexed { i, data ->
