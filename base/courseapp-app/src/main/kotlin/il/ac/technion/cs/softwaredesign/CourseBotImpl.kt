@@ -1,7 +1,6 @@
 package il.ac.technion.cs.softwaredesign
 
 
-import com.sun.javaws.exceptions.InvalidArgumentException
 import il.ac.technion.cs.softwaredesign.exceptions.InvalidTokenException
 import il.ac.technion.cs.softwaredesign.exceptions.NoSuchEntityException
 import il.ac.technion.cs.softwaredesign.exceptions.UserNotAuthorizedException
@@ -558,15 +557,15 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
                 var r: String? = null
                 var m: MediaType? = null
                 val splitedString = s.split(keySeparator, limit = 5)
-                val e = InvalidArgumentException(arrayOf("The string does not match MessageCounterTreeKey pattern"))
-                if (splitedString.size > 4) throw e
+//                val e = InvalidArgumentException(arrayOf("The string does not match MessageCounterTreeKey pattern"))
+                if (splitedString.size > 4) throw java.lang.IllegalArgumentException()
                 splitedString.forEachIndexed { i, data ->
                     when (i) {
                         0 -> name = data
                         1 -> channel = data
                         2 -> r = data
                         3 -> m = if (data.isNotEmpty()) MediaType.valueOf(data) else null
-                        else -> throw e
+                        else -> throw java.lang.IllegalArgumentException()
                     }
                 }
                 return MessageCounterTreeKey(name, channel, r, m)
@@ -584,7 +583,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
                 lateinit var channel: String
                 lateinit var sen: String
                 val splitedString = s.split(keySeparator, limit = 3)
-                val e = InvalidArgumentException(arrayOf("The string does not match MostActiveUserTreeKey pattern"))
+                val e = java.lang.IllegalArgumentException()
                 if (splitedString.size > 3) throw e
                 splitedString.forEachIndexed { i, data ->
                     when (i) {
@@ -608,7 +607,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
                 lateinit var name: String
                 lateinit var sid: String
                 val splitedString = s.split(keySeparator, limit = 2)
-                val e = InvalidArgumentException(arrayOf("The string does not match SurveiesTreeKey pattern"))
+                val e = java.lang.IllegalArgumentException()
                 if (splitedString.size > 2) throw e
                 splitedString.forEachIndexed { i, data ->
                     when (i) {

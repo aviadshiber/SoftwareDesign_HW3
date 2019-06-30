@@ -6,7 +6,6 @@ import io.github.vjames19.futures.jdk8.ImmediateFuture
 import java.util.concurrent.CompletableFuture
 import javax.inject.Singleton
 
-@Singleton
 class SecureHashMapStorageFactoryImpl : SecureStorageFactory {
     class ByteArrayKey(private val bytes: ByteArray) {
         override fun equals(other: Any?): Boolean =

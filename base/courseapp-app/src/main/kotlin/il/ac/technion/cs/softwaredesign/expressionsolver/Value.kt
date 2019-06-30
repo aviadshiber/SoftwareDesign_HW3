@@ -91,7 +91,7 @@ data class Value(val textualValue: String) {
                 // push the operation to the stack
                 tokens.add(getOperationForChar(c)!!)
             } else if (!c.isDigit() && c != '_' && c != '.') {
-                println("WARN: unrecognized character: $c. Ignoring")
+                //println("WARN: unrecognized character: $c. Ignoring")
             }
 
 
@@ -137,7 +137,7 @@ fun flatten(tokens: ArrayList<Any>, vararg ops: Operation) {
     tokenSwap.addAll(tokens)
 
     while (!ops.none { tokens.contains(it) }) {
-        println(tokens.joinToString(separator = " "))
+        //println(tokens.joinToString(separator = " "))
 
         for (i in tokens.indices) {
             var topBreak = false

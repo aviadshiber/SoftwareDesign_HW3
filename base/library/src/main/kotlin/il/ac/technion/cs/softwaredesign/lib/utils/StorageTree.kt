@@ -107,7 +107,7 @@ open class StorageTree<K: Comparable<K>, V>(private val storage: CompletableFutu
 
                                     res.leftId = map["li"] as Int?
                                     res.rightId = map["ri"] as Int?
-                                    println("Des Object: ${res.value}")
+                                    //println("Des Object: ${res.value}")
                                     res.storage = tree.storage
 
                                     res

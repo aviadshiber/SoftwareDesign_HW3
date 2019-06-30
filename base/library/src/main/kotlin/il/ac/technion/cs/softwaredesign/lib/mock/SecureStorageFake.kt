@@ -20,7 +20,7 @@ class SecureStorageFake : SecureStorage {
         if (value != null) {
             Thread.sleep(value.size.toLong())
 //            println("Read ${String(key)}")
-            println("time: ${value.size.toLong()}")
+            //println("time: ${value.size.toLong()}")
 //            println(String(key))
         }
         return CompletableFuture.completedFuture(value)
