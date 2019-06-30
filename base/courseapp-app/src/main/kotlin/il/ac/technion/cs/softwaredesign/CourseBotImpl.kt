@@ -278,7 +278,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
                                 }
                             }
                     // .thenCompose { courseBotApi.treeClean(surveyTreeType, bot.name) } //we should never delete the surveys even when bot leave a channel
-                }.thenCompose { MostActiveUsers(channelName, bot.name, courseBotApi).resetCounters() }
+                }.thenCompose { MostActiveUsers(channelName, bot.name, courseBotApi).cleanData() }.thenDispose()
     }
 
     private fun invalidateCounter(channelName: String?, treeType: String, name: String): CompletableFuture<Unit> {

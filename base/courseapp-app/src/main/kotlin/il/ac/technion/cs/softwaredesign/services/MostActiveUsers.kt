@@ -21,6 +21,12 @@ class MostActiveUsers(private val channelName: String, private val botName: Stri
         return getTop()
     }
 
+    fun cleanData(): CompletableFuture<MostActiveUsers> {
+        return userMsgCountersTree.treeClean(channelName, botName)
+                .thenCompose { userNamesToMsgCounters.treeClean(channelName, botName) }
+                .thenApply { this }
+    }
+
     fun resetCounters(): CompletableFuture<Unit> {
         return userNamesToMsgCounters.treeGet(channelName, botName).thenCompose { users ->
             users.mapComposeList { username ->

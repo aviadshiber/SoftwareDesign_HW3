@@ -1095,7 +1095,7 @@ open class CourseBotTest : CourseTest() {
 
             reconnect(bot, channel)
 
-            reboot();
+            //reboot()
 
             assertThat(bot.mostActiveUser(channel).join(), absent())
         }
