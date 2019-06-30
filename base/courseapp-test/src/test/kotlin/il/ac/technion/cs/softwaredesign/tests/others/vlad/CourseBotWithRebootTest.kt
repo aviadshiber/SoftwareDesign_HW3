@@ -35,7 +35,6 @@ class CourseBotWithRebootTest : CourseBotTest() {
             reboot()
             assertThat(bot.mostActiveUser(channel).join(), present(equalTo("user")))
         }
-
     }
 
     @Nested
