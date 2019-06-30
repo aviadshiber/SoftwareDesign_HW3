@@ -145,7 +145,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
 
     private fun restoreChannelListeners(keyPrefix: String, channelName: String?): CompletableFuture<Unit> {
         val key = combineArgsToString(keyPrefix, channelName)
-        return (callbacksMap[key]?.values?.toList()?.mapComposeList { callback -> addChannelListener(keyPrefix, channelName, callback) })
+        return (getCallbacks(key)?.mapComposeList { callback -> addChannelListener(keyPrefix, channelName, callback) })
                 ?: ImmediateFuture { }
 
     }
@@ -409,19 +409,27 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
         val prev = prop.get(bot)
         prop.set(bot, trigger)
         if (prev != null) {
-            val prevCallback = callbacksMap[key]?.values?.toList()?.getOrNull(0)
+            val prevCallback = getCallback(key)
             if (prevCallback!=null) courseApp.removeListener(bot.token, prevCallback)
             else ImmediateFuture { prev }
         }
         return if (trigger != null) {
             val callback = buildTriggerCallback(trigger, r, action)
-            callbacksMap[key]?.clear() //there is only one trigger of that key so we clear if we have any other callbacks
-            putCallback(key, callback)
+            overrideCallback(key, callback)
             courseApp.addListener(bot.token, callback).thenApply { prev }
         } else {
             callbacksMap[key]?.clear()
             ImmediateFuture { prev }
         }
+    }
+
+    private fun getCallback(key: String) = getCallbacks(key)?.getOrNull(0)
+
+    private fun getCallbacks(key: String) = callbacksMap[key]?.values?.toList()
+
+    private fun overrideCallback(key: String, callback: ListenerCallback) {
+        callbacksMap[key]?.clear()
+        putCallback(key, callback)
     }
 
     private fun buildTriggerCallback(trigger: String?, r: Regex, action: (source: String, message: Message) -> CompletableFuture<Unit>): ListenerCallback {
