@@ -181,9 +181,9 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
     }
 
     private fun buildMostActiveUserCallback(channelName: String): ListenerCallback {
-        return { source: String, _: Message ->
+        return { source: String, m: Message ->
             ImmediateFuture {
-                if (isChannelNameValid(source) && source.channelName == channelName) {
+                if (isChannelNameValid(source) && m.media == MediaType.TEXT && source.channelName == channelName) {
                     val sender = source.sender
                     if (sender.isEmpty()) ImmediateFuture { Unit }
                     else {
@@ -199,7 +199,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
     //botNme_channel
     private fun buildLastSeenMsgCallback(channelName: String): ListenerCallback {
         return { source: String, message: Message ->
-            if (isChannelNameValid(source) && source.channelName == channelName) {
+            if (isChannelNameValid(source) && message.media == MediaType.TEXT && source.channelName == channelName) {
                 val key = GenericKeyPair(0L, source.sender)
                 lastSeenUserTreeWrapper.treeSearch(lastSeenTreeType, bot.name, key).thenCompose { timeString ->
                     updateLastSeenForNewMessageFuture(key, timeString, message)
@@ -471,7 +471,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
     private fun buildSurveyCallback(channel: String, surveyClient: SurveyClient): ListenerCallback {
         return { source: String, message: Message ->
             isValidRegistration(bot.name, source, channel).thenCompose { valid ->
-                if (valid) {
+                if (valid && message.media == MediaType.TEXT) {
                     val content = String(message.contents)
                     val sender = source.sender
                     surveyClient.getAnswers().thenCompose { answers ->
