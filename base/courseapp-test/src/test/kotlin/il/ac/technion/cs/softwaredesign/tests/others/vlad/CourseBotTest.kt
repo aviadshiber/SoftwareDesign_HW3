@@ -1093,7 +1093,7 @@ open class CourseBotTest : CourseTest() {
                     .join()
             sendMessageToChannel(adminToken, channel, MediaType.TEXT, "42")
 
-            reconnect(bot, channel)
+            reconnect(bot, channel) // part channel + join channel
 
             //reboot()
 
