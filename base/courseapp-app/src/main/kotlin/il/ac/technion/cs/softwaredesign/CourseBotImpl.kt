@@ -26,6 +26,7 @@ import io.github.vjames19.futures.jdk8.mapError
 import io.github.vjames19.futures.jdk8.recover
 import java.time.LocalDateTime
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.reflect.KMutableProperty1
 
 
@@ -58,7 +59,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
     private val botTreeWrapper: TreeWrapper = TreeWrapper(courseBotApi, "bot_")
     private val lastSeenUserTreeWrapper: TreeWrapper = TreeWrapper(courseBotApi, "bot_")
 
-    private val callbacksMap: MutableMap<String, MutableList<ListenerCallback>> = mutableMapOf()
+    private val callbacksMap: MutableMap<String, ConcurrentHashMap<ListenerCallback, ListenerCallback>> = ConcurrentHashMap()
 
 
     // TODO: 2 options: list insert will get id.toString() or channel name
@@ -135,47 +136,38 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
                             .thenCompose { addChannelListener(mostActiveCallbackPrefix, channelName, buildMostActiveUserCallback(channelName)) }
                             .thenCompose { restoreChannelListeners(countCallbackPrefix, channelName) }
                             .thenCompose { restoreChannelListeners(surveyCallbackPrefix, channelName) }
-                            .thenCompose { restoreTrigger(tipTriggerCallbackKey) }
-                            .thenCompose { restoreTrigger(calculatorTriggerCallbackKey) }
+
                 }
 
     }
 
-    private fun restoreTrigger(key: String): CompletableFuture<Unit> {
-        val callbacks = callbacksMap[key]
-        return when {
-            callbacks != null -> {
-                val callback = callbacks.getOrNull(0)
-                when {
-                    callback != null -> courseApp.addListener(bot.token, callback)
-                    else -> ImmediateFuture { }
-                }
-            }
-            else -> ImmediateFuture { }
-        }
-    }
 
 
     private fun restoreChannelListeners(keyPrefix: String, channelName: String?): CompletableFuture<Unit> {
         val key = combineArgsToString(keyPrefix, channelName)
-        return (callbacksMap[key]
-                ?.mapComposeList { callback -> addChannelListener(keyPrefix, channelName, callback) })
+        return (callbacksMap[key]?.values?.toList()?.mapComposeList { callback -> addChannelListener(keyPrefix, channelName, callback) })
                 ?: ImmediateFuture { }
 
     }
 
     private fun addChannelListener(keyPrefix: String, channelName: String?, callback: ListenerCallback): CompletableFuture<Unit> {
         val key = combineArgsToString(keyPrefix, channelName)
-        if (callbacksMap[key] == null)
-            callbacksMap[key] = mutableListOf(callback)
-        else
-            callbacksMap[key]!!.add(callback)
+        putCallback(key, callback)
         return courseApp.addListener(bot.token, callback)
+    }
+
+    private fun putCallback(key: String, callback: ListenerCallback) {
+        val callbacks = callbacksMap[key] ?: ConcurrentHashMap()
+        callbacks[callback] = callback
+        callbacksMap[key] = callbacks
     }
 
     private fun removeChannelListeners(keyPrefix: String, channelName: String): CompletableFuture<Unit> {
         val callbacks = callbacksMap[combineArgsToString(keyPrefix, channelName)]
-        return callbacks?.mapComposeList { callback -> courseApp.removeListener(bot.token, callback) }
+        return callbacks
+                ?.values
+                ?.toList()
+                ?.mapComposeList { callback -> courseApp.removeListener(bot.token, callback) }
                 ?: ImmediateFuture { }
     }
 
@@ -417,13 +409,14 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
         val prev = prop.get(bot)
         prop.set(bot, trigger)
         if (prev != null) {
-            val prevCallback = callbacksMap[key]?.getOrNull(0)
+            val prevCallback = callbacksMap[key]?.values?.toList()?.getOrNull(0)
             if (prevCallback!=null) courseApp.removeListener(bot.token, prevCallback)
             else ImmediateFuture { prev }
         }
         return if (trigger != null) {
             val callback = buildTriggerCallback(trigger, r, action)
-            callbacksMap[key] = mutableListOf(callback)
+            callbacksMap[key]?.clear() //there is only one trigger of that key so we clear if we have any other callbacks
+            putCallback(key, callback)
             courseApp.addListener(bot.token, callback).thenApply { prev }
         } else {
             callbacksMap[key]?.clear()

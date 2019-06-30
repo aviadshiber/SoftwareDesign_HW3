@@ -42,3 +42,4 @@ fun <T, U> List<T>.mapComposeList(transform: (T) -> CompletableFuture<U>): Compl
                 .thenApply { Unit }
     else ImmediateFuture { Unit }
 }
+

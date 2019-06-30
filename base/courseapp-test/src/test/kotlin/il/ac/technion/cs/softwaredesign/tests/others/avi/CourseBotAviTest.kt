@@ -12,7 +12,9 @@ import il.ac.technion.cs.softwaredesign.*
 import il.ac.technion.cs.softwaredesign.exceptions.NoSuchEntityException
 import il.ac.technion.cs.softwaredesign.exceptions.UserAlreadyLoggedInException
 import il.ac.technion.cs.softwaredesign.exceptions.UserNotAuthorizedException
-import il.ac.technion.cs.softwaredesign.messages.*
+import il.ac.technion.cs.softwaredesign.messages.MediaType
+import il.ac.technion.cs.softwaredesign.messages.Message
+import il.ac.technion.cs.softwaredesign.messages.MessageFactory
 import il.ac.technion.cs.softwaredesign.storage.SecureStorage
 import il.ac.technion.cs.softwaredesign.storage.SecureStorageFactory
 import il.ac.technion.cs.softwaredesign.tests.*
@@ -147,7 +149,7 @@ class CourseBotTest {
         fun `throws when can't part`() {
             every { app.login(any(), any()) } returns completedOf("1")
             every { app.addListener(any(), any()) } returns completedOf()
-//            every { app.channelPart(any(), any()) } returns failedOf(NoSuchEntityException())
+            //every { app.channelPart(any(), any()) } throws completedOf(NoSuchEntityException())
 
             val bot = bots.bot().join()
 
