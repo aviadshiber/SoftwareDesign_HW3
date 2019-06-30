@@ -121,19 +121,16 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
     private fun isNewMessageByCreationTime(message: Message, time: LocalDateTime) = message.created > time
 
     override fun join(channelName: String): CompletableFuture<Unit> {
-        return courseApp.channelJoin(bot.token, channelName)
-                .recover { throw UserNotAuthorizedException() }
-                .thenCompose { courseApp.isUserInChannel(bot.token, channelName, bot.name) }
-                .thenCompose { alreadyJoined ->
-                    if (alreadyJoined!!) //this could not be null because bot must be in channel if we get here
-                        ImmediateFuture { }
-                    else createChannelIfNotExist(channelName)
-                            .thenCompose { channelId -> addChannelToBot(channelName, channelId) }
-                            .thenCompose { addBotToChannel(channelName) }
-                            .thenCompose { addChannelListener(lastSeenCallbackPrefix, channelName, buildLastSeenMsgCallback(channelName)) }
-                            .thenCompose { addChannelListener(mostActiveCallbackPrefix, channelName, buildMostActiveUserCallback(channelName)) }
-                }
-
+        return courseApp.isUserInChannel(bot.token, channelName, bot.name).thenCompose { isUserInChannel ->
+            if (isUserInChannel == true) ImmediateFuture { }
+            else courseApp.channelJoin(bot.token, channelName)
+                    .recover { throw UserNotAuthorizedException() }
+                    .thenCompose { createChannelIfNotExist(channelName) }
+                    .thenCompose { channelId -> addChannelToBot(channelName, channelId) }
+                    .thenCompose { addBotToChannel(channelName) }
+                    .thenCompose { addChannelListener(lastSeenCallbackPrefix, channelName, buildLastSeenMsgCallback(channelName)) }
+                    .thenCompose { addChannelListener(mostActiveCallbackPrefix, channelName, buildMostActiveUserCallback(channelName)) }
+        }
 
     }
 
