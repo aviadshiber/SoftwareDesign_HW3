@@ -14,6 +14,8 @@ import il.ac.technion.cs.softwaredesign.tests.FakeCourseAppInitializer
 
 class VladTestModule : KotlinModule() {
     override fun configure() {
+        bind<MutableMap<String, String>>().to<LinkedHashMap<String, String>>()
+        bind<MutableSet<String>>().to<LinkedHashSet<String>>()
         bind<SecureStorageFactory>().toInstance(FakeStorageFactory())
 //        bind<SecureStorageFactory>().toInstance(SecureHashMapStorageFactoryImpl())
         bind<MessageFactory>().to<MessageFactoryImpl>()

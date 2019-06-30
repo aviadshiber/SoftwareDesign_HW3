@@ -11,6 +11,8 @@ import il.ac.technion.cs.softwaredesign.storage.SecureStorageFactory
 
 class TestModule : KotlinModule() {
     override fun configure() {
+        bind<MutableMap<String, String>>().to<LinkedHashMap<String, String>>()
+        bind<MutableSet<String>>().to<LinkedHashSet<String>>()
         bind<SecureStorageFactory>().toInstance(SecureHashMapStorageFactoryImpl())
         bind<MessageFactory>().to<MessageFactoryImpl>()
         bind<Message>().to<MessageImpl>()
