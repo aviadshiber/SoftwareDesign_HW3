@@ -123,11 +123,18 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
     override fun join(channelName: String): CompletableFuture<Unit> {
         return courseApp.channelJoin(bot.token, channelName)
                 .recover { throw UserNotAuthorizedException() }
-                .thenCompose { createChannelIfNotExist(channelName) }
-                .thenCompose { channelId -> addChannelToBot(channelName, channelId) }
-                .thenCompose { addBotToChannel(channelName) }
-                .thenCompose { addChannelListener(lastSeenCallbackPrefix, channelName, buildLastSeenMsgCallback(channelName)) }
-                .thenCompose { addChannelListener(mostActiveCallbackPrefix, channelName, buildMostActiveUserCallback(channelName)) }
+                .thenCompose { courseApp.isUserInChannel(bot.token, channelName, bot.name) }
+                .thenCompose { alreadyJoined ->
+                    if (alreadyJoined!!) //this could not be null because bot must be in channel if we get here
+                        ImmediateFuture { }
+                    else createChannelIfNotExist(channelName)
+                            .thenCompose { channelId -> addChannelToBot(channelName, channelId) }
+                            .thenCompose { addBotToChannel(channelName) }
+                            .thenCompose { addChannelListener(lastSeenCallbackPrefix, channelName, buildLastSeenMsgCallback(channelName)) }
+                            .thenCompose { addChannelListener(mostActiveCallbackPrefix, channelName, buildMostActiveUserCallback(channelName)) }
+                }
+
+
     }
 
     private fun addChannelListener(keyPrefix: String, channelName: String?, callback: ListenerCallback): CompletableFuture<Unit> {
@@ -141,8 +148,8 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
 
     private fun removeChannelListeners(keyPrefix: String, channelName: String): CompletableFuture<Unit> {
         val callbacks = callbacksMap[combineArgsToString(keyPrefix, channelName)]
-        return if (callbacks == null) ImmediateFuture { }
-        else callbacks.mapComposeList { callback -> courseApp.removeListener(bot.token, callback) }
+        return callbacks?.mapComposeList { callback -> courseApp.removeListener(bot.token, callback) }
+                ?: ImmediateFuture { }
     }
 
     fun loadAllBotListeners(): CompletableFuture<Unit> {
