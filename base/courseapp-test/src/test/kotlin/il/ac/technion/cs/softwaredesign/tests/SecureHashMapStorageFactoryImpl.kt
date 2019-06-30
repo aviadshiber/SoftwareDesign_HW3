@@ -14,7 +14,8 @@ class SecureHashMapStorageFactoryImpl : SecureStorageFactory {
         override fun hashCode(): Int = bytes.contentHashCode()
         override fun toString(): String = bytes.contentToString()
     }
-    private val storages = mutableMapOf<ByteArrayKey, SecureStorage>()
+
+    var storages = mutableMapOf<ByteArrayKey, SecureStorage>()
 
     override fun open(name: ByteArray): CompletableFuture<SecureStorage> {
         var storage = storages[ByteArrayKey(name)]

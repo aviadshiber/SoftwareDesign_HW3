@@ -8,15 +8,16 @@ import il.ac.technion.cs.softwaredesign.exceptions.NoSuchEntityException
 import il.ac.technion.cs.softwaredesign.exceptions.UserNotAuthorizedException
 import il.ac.technion.cs.softwaredesign.messages.MediaType
 import il.ac.technion.cs.softwaredesign.messages.MessageFactory
-import il.ac.technion.cs.softwaredesign.messages.MessageFactoryImpl
 import il.ac.technion.cs.softwaredesign.storage.SecureStorage
 import il.ac.technion.cs.softwaredesign.storage.SecureStorageFactory
 import il.ac.technion.cs.softwaredesign.tests.FakeCourseApp
-import il.ac.technion.cs.softwaredesign.tests.SecureHashMapStorageFactoryImpl
-import il.ac.technion.cs.softwaredesign.tests.TestModule
+import il.ac.technion.cs.softwaredesign.tests.others.vlad.FakeStorage
+import il.ac.technion.cs.softwaredesign.tests.others.vlad.FakeStorageFactory
+import il.ac.technion.cs.softwaredesign.tests.others.vlad.VladTestModule
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
@@ -54,7 +55,7 @@ class CourseBotTest {
 //        messageFactory = MessageFactoryImpl(ssf)
     }
 
-    private var injector = Guice.createInjector(CourseAppModule(), CourseBotModule(), TestModule())
+    private var injector = Guice.createInjector(CourseAppModule(), CourseBotModule(), VladTestModule())
 
     init {
         injector.getInstance<CourseAppInitializer>().setup().join()
@@ -1241,18 +1242,14 @@ class CourseBotTest {
 
         courseApp.channelSend(token1, "#channel1", messageFactory.create(MediaType.TEXT, "tip 20 user2".toByteArray()).join()).join()
 
-        val oldFactory = injector.getInstance<SecureHashMapStorageFactoryImpl>()
-
-        injector = Guice.createInjector(CourseAppModule(), CourseBotModule(), TestModule())
+        injector = Guice.createInjector(CourseAppModule(), CourseBotModule(), VladTestModule())
 
         injector.getInstance<CourseAppInitializer>().setup().join()
 
-//        val newDataStore = DataStoreImpl(ssf)
         val newCourseApp = injector.getInstance<CourseApp>()
         val newMessageFactory = injector.getInstance<MessageFactory>()
         val newCourseBots = injector.getInstance<CourseBots>()
         (newCourseApp as FakeCourseApp).restore(courseApp as FakeCourseApp)
-        val newFactory = injector.getInstance<SecureHashMapStorageFactoryImpl>()
 
         newCourseBots.start().join()
         newCourseApp.addListener(adminToken, listener).join()
@@ -1275,6 +1272,12 @@ class CourseBotTest {
         Assertions.assertNull(sameBot.richestUser("#channel1").join())
     }
 
+    @AfterEach
+    fun clearDb() {
+        FakeStorage("botNames".toByteArray()).clear()
+        FakeStorage("botsNameToData".toByteArray()).clear()
+        FakeStorageFactory.names.clear()
+    }
 
     @Test
     fun `can retrieve all bots created correctly`(){

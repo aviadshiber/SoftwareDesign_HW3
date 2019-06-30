@@ -389,15 +389,15 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
         val prev = prop.get(bot)
         prop.set(bot, trigger)
         if (prev != null) {
-            val prevCallback = callbacksMap[key]?.getOrNull(0)!!
-            courseApp.removeListener(bot.token, prevCallback)
+            val prevCallback = callbacksMap[key]?.getOrNull(0)
+            if (prevCallback!=null) courseApp.removeListener(bot.token, prevCallback)
+            else ImmediateFuture { prev }
         }
         return if(trigger!=null) {
             val callback = buildTriggerCallback(trigger, r, action)
             callbacksMap[key] = mutableListOf(callback)
             courseApp.addListener(bot.token, callback).thenApply { prev }
-        }
-        else {
+        } else {
             callbacksMap[key]?.clear()
             ImmediateFuture { prev }
         }
