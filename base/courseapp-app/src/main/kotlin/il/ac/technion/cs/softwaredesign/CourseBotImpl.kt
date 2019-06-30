@@ -46,6 +46,8 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
         private const val mostActiveCallbackPrefix = "mostActive"
         private const val surveyCallbackPrefix = "surveyCallbacks"
         private const val countCallbackPrefix = "countCallbacks"
+        private const val tipTriggerCallbackKey = "tipTriggerCallbackKey"
+        private const val calculatorTriggerCallbackKey = "calcTriggerCallback"
 
         private const val keySeparator = "~"
         fun combineArgsToString(vararg values: Any?): String =
@@ -57,7 +59,6 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
     private val lastSeenUserTreeWrapper: TreeWrapper = TreeWrapper(courseBotApi, "bot_")
 
     private val callbacksMap: MutableMap<String, MutableList<ListenerCallback>> = mutableMapOf()
-
 
 
     // TODO: 2 options: list insert will get id.toString() or channel name
@@ -124,15 +125,42 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
         return courseApp.isUserInChannel(bot.token, channelName, bot.name)
                 .recover { e -> false }
                 .thenCompose { isUserInChannel ->
-            if (isUserInChannel == true) ImmediateFuture { }
-            else courseApp.channelJoin(bot.token, channelName)
-                    .recover { throw UserNotAuthorizedException() }
-                    .thenCompose { createChannelIfNotExist(channelName) }
-                    .thenCompose { channelId -> addChannelToBot(channelName, channelId) }
-                    .thenCompose { addBotToChannel(channelName) }
-                    .thenCompose { addChannelListener(lastSeenCallbackPrefix, channelName, buildLastSeenMsgCallback(channelName)) }
-                    .thenCompose { addChannelListener(mostActiveCallbackPrefix, channelName, buildMostActiveUserCallback(channelName)) }
+                    if (isUserInChannel == true) ImmediateFuture { }
+                    else courseApp.channelJoin(bot.token, channelName)
+                            .recover { throw UserNotAuthorizedException() }
+                            .thenCompose { createChannelIfNotExist(channelName) }
+                            .thenCompose { channelId -> addChannelToBot(channelName, channelId) }
+                            .thenCompose { addBotToChannel(channelName) }
+                            .thenCompose { addChannelListener(lastSeenCallbackPrefix, channelName, buildLastSeenMsgCallback(channelName)) }
+                            .thenCompose { addChannelListener(mostActiveCallbackPrefix, channelName, buildMostActiveUserCallback(channelName)) }
+                            .thenCompose { restoreChannelListeners(countCallbackPrefix, channelName) }
+                            .thenCompose { restoreChannelListeners(surveyCallbackPrefix, channelName) }
+                            .thenCompose { restoreTrigger(tipTriggerCallbackKey) }
+                            .thenCompose { restoreTrigger(calculatorTriggerCallbackKey) }
+                }
+
+    }
+
+    private fun restoreTrigger(key: String): CompletableFuture<Unit> {
+        val callbacks = callbacksMap[key]
+        return when {
+            callbacks != null -> {
+                val callback = callbacks.getOrNull(0)
+                when {
+                    callback != null -> courseApp.addListener(bot.token, callback)
+                    else -> ImmediateFuture { }
+                }
+            }
+            else -> ImmediateFuture { }
         }
+    }
+
+
+    private fun restoreChannelListeners(keyPrefix: String, channelName: String?): CompletableFuture<Unit> {
+        val key = combineArgsToString(keyPrefix, channelName)
+        return (callbacksMap[key]
+                ?.mapComposeList { callback -> addChannelListener(keyPrefix, channelName, callback) })
+                ?: ImmediateFuture { }
 
     }
 
@@ -155,7 +183,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
         val primitiveCallbacks = getChannelNames()
                 .thenCompose { channelNames ->
                     channelNames.mapComposeList { channelName ->
-                        courseApp.addListener(bot.token, buildLastSeenMsgCallback(channelName)) // TODO: fix LastSeen callbacks
+                        courseApp.addListener(bot.token, buildLastSeenMsgCallback(channelName))
                                 .thenCompose { courseApp.addListener(bot.token, buildMostActiveUserCallback(channelName)) }
                     }
                 }
@@ -366,7 +394,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
     override fun setCalculationTrigger(trigger: String?): CompletableFuture<String?> {
         val regex = calculationTriggerRegex(trigger)
 
-        return setCallBackForTrigger(Bot::calculationTrigger, trigger, "calculationTrigger", regex) { source: String, message: Message ->
+        return setCallBackForTrigger(Bot::calculationTrigger, trigger, calculatorTriggerCallbackKey, regex) { source: String, message: Message ->
             val content = String(message.contents)
             val (expression) = regex.find(content)!!.destructured
             try {
@@ -393,7 +421,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
             if (prevCallback!=null) courseApp.removeListener(bot.token, prevCallback)
             else ImmediateFuture { prev }
         }
-        return if(trigger!=null) {
+        return if (trigger != null) {
             val callback = buildTriggerCallback(trigger, r, action)
             callbacksMap[key] = mutableListOf(callback)
             courseApp.addListener(bot.token, callback).thenApply { prev }
@@ -414,7 +442,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
 
     override fun setTipTrigger(trigger: String?): CompletableFuture<String?> {
         val regex = tippingRegex(trigger) //$trigger $number $user
-        return setCallBackForTrigger(Bot::tipTrigger, trigger, "tipTrigger", regex) { source: String, message: Message ->
+        return setCallBackForTrigger(Bot::tipTrigger, trigger, tipTriggerCallbackKey, regex) { source: String, message: Message ->
             val content = String(message.contents)
             val (number, destUserName) = regex.find(content)!!.destructured
             val channelName = source.channelName
@@ -469,8 +497,6 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
                     else SurveyClient(identifier.toLong(), bot.name, courseBotApi).getVoteCounters()
                 }
     }
-
-
 
 
     // botname_channel_surveyId
