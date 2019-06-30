@@ -3,7 +3,6 @@ package il.ac.technion.cs.softwaredesign.tests.others.vlad
 import com.authzee.kotlinguice4.KotlinModule
 import il.ac.technion.cs.softwaredesign.CourseApp
 import il.ac.technion.cs.softwaredesign.CourseAppInitializer
-import il.ac.technion.cs.softwaredesign.tests.others.vlad.FakeStorageFactory
 import il.ac.technion.cs.softwaredesign.messages.Message
 import il.ac.technion.cs.softwaredesign.messages.MessageFactory
 import il.ac.technion.cs.softwaredesign.messages.MessageFactoryImpl
@@ -22,5 +21,7 @@ class VladTestModule : KotlinModule() {
         bind<Message>().to<MessageImpl>()
         bind<CourseAppInitializer>().to<FakeCourseAppInitializer>()
         bind<CourseApp>().to<FakeCourseApp>()
+        bind<MutableMap<String, String>>().to<LinkedHashMap<String, String>>()
+        bind<MutableSet<String>>().to<LinkedHashSet<String>>()
     }
 }
