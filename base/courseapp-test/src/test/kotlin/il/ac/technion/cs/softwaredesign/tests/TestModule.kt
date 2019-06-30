@@ -16,5 +16,7 @@ class TestModule : KotlinModule() {
         bind<Message>().to<MessageImpl>()
         bind<CourseAppInitializer>().to<FakeCourseAppInitializer>()
         bind<CourseApp>().to<FakeCourseApp>()
+        bind<MutableMap<String, String>>().to<LinkedHashMap<String, String>>()
+        bind<MutableSet<String>>().to<LinkedHashSet<String>>()
     }
 }
