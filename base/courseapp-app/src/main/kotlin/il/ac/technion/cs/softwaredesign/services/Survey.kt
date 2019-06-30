@@ -99,7 +99,8 @@ class SurveyClient constructor(surveyId: Long, private val botName: String, priv
                 .thenCompose {
                     it.mapComposeList { u ->
                         val voteId = createVoteId(u)
-                        botApi.updateVoteAnswer(voteId, 0)
+                        botApi.deleteVoteAnswer(voteId)
+//                        botApi.updateVoteAnswer(voteId, 0)
                     }
                 }.thenCompose { usersTree.treeClean(SurveyModel.LIST_S_USERS, id) }
                 .thenApply { this }
