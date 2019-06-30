@@ -114,7 +114,7 @@ open class CourseBotTest : CourseTest() {
         }
 
         @Test
-        fun `counter get reset after parting from channel count`() {
+        fun `IllegalArgumentException after parting from channel count`() {
             val channel = "#hell"
             val regex = ".*"
 
@@ -130,7 +130,7 @@ open class CourseBotTest : CourseTest() {
         }
 
         @Test
-        fun `counter get reset after parting and joining from count`() {
+        fun `IllegalArgumentException after parting and joining from count`() {
             val channel = "#hell"
             val regex = ".*"
 
@@ -142,7 +142,6 @@ open class CourseBotTest : CourseTest() {
                     .thenCompose { bot.part(channel) }
                     .thenCompose { bot.join(channel) }
                     .join()
-
             assertThat(bot.count(channel, regex).join(), present(equalTo(0L)))
         }
 
@@ -158,8 +157,10 @@ open class CourseBotTest : CourseTest() {
                     .thenApply { sendMessageToChannel(adminToken, channel, MediaType.TEXT, "42") }
                     .thenCompose { bot.part(channel) }
                     .thenCompose { bot.join(channel) }
+                    .thenCompose { bot.beginCount(channel = channel, regex = regex) }
                     .join()
-            assertThat(bot.count(channel, regex).join(), present(equalTo(0L)))
+
+            assertThat(bot.count(channel, regex).joinException(), equalTo(0L))
         }
 
         @Test
@@ -191,7 +192,6 @@ open class CourseBotTest : CourseTest() {
 
             assertThat(bot.count(regex = regex).join(), equalTo(0L))
         }
-
 
         private fun channelWithAudioAndChannelWithText(channel: String? = null) {
             val channel1 = "#kiss"
@@ -501,6 +501,49 @@ open class CourseBotTest : CourseTest() {
             assertThat(bot.richestUser(channel).join(), absent())
         }
 
+        @Test
+        fun `after reconnect richest user is null`() {
+            val channel = "#taub"
+            val token1 = courseApp.login("user", "pass").join()
+
+            createChannelWithUsersDoTippingAndReturnRichest(
+                    listOf(adminToken, token1),
+                    listOf(Triple(adminToken, 42L, "user")),
+                    channel = channel
+            )
+
+            reconnect(bot, channel)
+
+            reboot()
+
+            assertThat(bot.richestUser(channel).join(), absent())
+        }
+
+        @Test
+        fun `after reconnect credict is restored`() {
+            val channel = "#taub"
+            val token1 = courseApp.login("user", "pass").join()
+            val token2 = courseApp.login("user1", "pass").join()
+
+            createChannelWithUsersDoTippingAndReturnRichest(
+                    listOf(adminToken, token1),
+                    listOf(Triple(adminToken, 1000L, "user")),
+                    channel = channel
+            )
+
+            reconnect(bot, channel)
+
+            createChannelWithUsersDoTippingAndReturnRichest(
+                    listOf(adminToken, token2),
+                    listOf(Triple(adminToken, 1000L, "user1")),
+                    channel = channel
+            )
+
+            reboot()
+
+            assertThat(bot.richestUser(channel).join(), present(equalTo("user1")))
+        }
+
         private fun createChannelWithUsersDoTippingAndReturnRichest(
                 tokens: List<String>,
                 tokenTipUserName: List<Triple<String, Long, String>>,
@@ -779,6 +822,42 @@ open class CourseBotTest : CourseTest() {
 
             assertThat(bot.seenTime(adminToken).join(), absent())
         }
+
+        @Test
+        fun `last seen time is same after bot part`() {
+            val channel = "#disturbed"
+
+            courseApp
+                    .channelJoin(adminToken, channel)
+                    .thenCompose { bot.join(channel) }
+                    .join()
+
+            val message = sendMessageToChannel(adminToken, channel, MediaType.TEXT, "Stupefy")
+
+            bot.part(channel).join()
+
+            reboot()
+
+            assertThat(bot.seenTime("admin").join(), equalTo(message.created))
+        }
+
+        @Test
+        fun `last seen time is same after bot reconnect`() {
+            val channel = "#disturbed"
+
+            courseApp
+                    .channelJoin(adminToken, channel)
+                    .thenCompose { bot.join(channel) }
+                    .join()
+
+            val message = sendMessageToChannel(adminToken, channel, MediaType.TEXT, "Stupefy")
+
+            reconnect(bot, channel)
+
+            reboot()
+
+            assertThat(bot.seenTime("admin").join(), equalTo(message.created))
+        }
     }
 
     @Nested
@@ -960,7 +1039,6 @@ open class CourseBotTest : CourseTest() {
             assertThat(bot.mostActiveUser(channel).join(), present(equalTo("admin")))
         }
 
-
         @Test
         fun `mostActiveUser does not depend on private message`() {
             val channel = "#"
@@ -984,6 +1062,40 @@ open class CourseBotTest : CourseTest() {
                     .join()
 
             sendMessageBroadcast(adminToken, MediaType.TEXT, "calc 2+2")
+
+            assertThat(bot.mostActiveUser(channel).join(), absent())
+        }
+
+        @Test
+        fun `mostActiveUser throws NoSuchEntityException after bot parted`() {
+            val channel = "#taub"
+
+            courseApp
+                    .channelJoin(adminToken, channel)
+                    .thenCompose { bot.join(channel) }
+                    .join()
+            sendMessageToChannel(adminToken, channel, MediaType.TEXT, "42")
+
+            bot.part(channel).join()
+
+            reboot();
+
+            assertThrows<NoSuchEntityException> { bot.mostActiveUser(channel).joinException() }
+        }
+
+        @Test
+        fun `mostActiveUser returns null after bot rejointed`() {
+            val channel = "#taub"
+
+            courseApp
+                    .channelJoin(adminToken, channel)
+                    .thenCompose { bot.join(channel) }
+                    .join()
+            sendMessageToChannel(adminToken, channel, MediaType.TEXT, "42")
+
+            reconnect(bot, channel)
+
+            reboot();
 
             assertThat(bot.mostActiveUser(channel).join(), absent())
         }
@@ -1218,4 +1330,7 @@ open class CourseBotTest : CourseTest() {
                 .join()
     }
 
+    private fun reconnect(bot: CourseBot, channelName: String) {
+        bot.part(channelName).thenCompose { bot.join(channelName) }.join()
+    }
 }
