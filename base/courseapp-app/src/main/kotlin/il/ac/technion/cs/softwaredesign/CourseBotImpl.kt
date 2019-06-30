@@ -145,7 +145,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
 
     private fun restoreChannelListeners(keyPrefix: String, channelName: String?): CompletableFuture<Unit> {
         val key = combineArgsToString(keyPrefix, channelName)
-        return (callbacksMap[key]?.values?.toList()?.mapComposeList { callback -> addChannelListener(keyPrefix, channelName, callback) })
+        return (getCallbacks(key)?.mapComposeList { callback -> addChannelListener(keyPrefix, channelName, callback) })
                 ?: ImmediateFuture { }
 
     }
@@ -409,7 +409,7 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
         val prev = prop.get(bot)
         prop.set(bot, trigger)
         if (prev != null) {
-            val prevCallback = callbacksMap[key]?.values?.toList()?.getOrNull(0)
+            val prevCallback = getCallback(key)
             if (prevCallback!=null) courseApp.removeListener(bot.token, prevCallback)
             else ImmediateFuture { prev }
         }
@@ -422,6 +422,10 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
             ImmediateFuture { prev }
         }
     }
+
+    private fun getCallback(key: String) = getCallbacks(key)?.getOrNull(0)
+
+    private fun getCallbacks(key: String) = callbacksMap[key]?.values?.toList()
 
     private fun overrideCallback(key: String, callback: ListenerCallback) {
         callbacksMap[key]?.clear()
