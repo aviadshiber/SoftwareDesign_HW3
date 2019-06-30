@@ -1,6 +1,7 @@
 
 import com.natpryce.hamkrest.*
 import com.natpryce.hamkrest.assertion.assertThat
+import il.ac.technion.cs.softwaredesign.lib.db.dal.GenericKeyPair
 import il.ac.technion.cs.softwaredesign.lib.mock.SecureStorageFactoryFake
 import il.ac.technion.cs.softwaredesign.lib.utils.BalancedStorageTree
 import il.ac.technion.cs.softwaredesign.storage.SecureStorage
@@ -125,45 +126,45 @@ class StorageTreeTests {
 
     @Test
     fun `Elements are properly inserted to the tree and storage`() {
-        val tree = BalancedStorageTree<Int, String>(storage = storageLayer)
+        val tree = BalancedStorageTree<GenericKeyPair<Long,String>, String>(storage = storageLayer)
 
-        val ret = tree.insert(1, ", ")
-                .thenCompose { tree.insert(2, "world") }
-                .thenCompose { tree.insert(0, "hello") }
+        val ret = tree.insert(GenericKeyPair(1L, "val"), ", ")
+                .thenCompose { tree.insert(GenericKeyPair(2L, "val"), "world") }
+                .thenCompose { tree.insert(GenericKeyPair(0L, "val"), "hello") }
                 .join()
 
         assertThat(ret, equalTo(true))
-        assertThat(tree.asSequence().join().toList().joinToString(separator = "") { it.second }, equalTo("hello, world"))
+        assertThat(tree.asSequence().join().toList().reversed().joinToString(separator = "") { it.second }, equalTo("hello, world"))
 
-        val other = BalancedStorageTree<Int, String>(storage = storageLayer)
-        assertThat(other.asSequence().join().toList().joinToString(separator = "") { it.second }, equalTo("hello, world"))
+        val other = BalancedStorageTree<GenericKeyPair<Long,String>, String>(storage = storageLayer)
+        assertThat(other.asSequence().join().toList().reversed().joinToString(separator = "") { it.second }, equalTo("hello, world"))
     }
     @Test
     fun `test clean of tree`() {
-        val tree = BalancedStorageTree<Int, String>(storage = storageLayer, type = "mytree")
+        val tree = BalancedStorageTree<GenericKeyPair<Long,String>, String>(storage = storageLayer, type = "mytree")
 
-        val ret = tree.insert(1, ", ")
-                .thenCompose { tree.insert(2, "world") }
-                .thenCompose { tree.insert(0, "hello") }
+        val ret = tree.insert(GenericKeyPair(1L, "val"), ", ")
+                .thenCompose { tree.insert(GenericKeyPair(2L, "val"), "world") }
+                .thenCompose { tree.insert(GenericKeyPair(0L, "val"), "hello") }
                 .join()
 
         assertThat(ret, equalTo(true))
-        assertThat(tree.asSequence().join().toList().joinToString(separator = "") { it.second }, equalTo("hello, world"))
+        assertThat(tree.asSequence().join().toList().reversed().joinToString(separator = "") { it.second }, equalTo("hello, world"))
 
-        val other = BalancedStorageTree<Int, String>(storage = storageLayer, type = "mytree")
-        assertThat(other.asSequence().join().toList().joinToString(separator = "") { it.second }, equalTo("hello, world"))
+        val other = BalancedStorageTree<GenericKeyPair<Long,String>, String>(storage = storageLayer, type = "mytree")
+        assertThat(other.asSequence().join().toList().reversed().joinToString(separator = "") { it.second }, equalTo("hello, world"))
         tree.clean()
         assertThat(tree.asSequence().join().toList().isEmpty(), equalTo(true))
-        assertThat(BalancedStorageTree<Int, String>(storage = storageLayer, type = "mytree")
+        assertThat(BalancedStorageTree<GenericKeyPair<Long,String>, String>(storage = storageLayer, type = "mytree")
                 .asSequence().join().toList().isEmpty(), equalTo(true))
-        tree.insert(1, ", ")
-                .thenCompose { tree.insert(2, "world") }
-                .thenCompose { tree.insert(0, "hello") }
+        tree.insert(GenericKeyPair(1L, "val"), ", ")
+                .thenCompose { tree.insert(GenericKeyPair(2L, "val"), "world") }
+                .thenCompose { tree.insert(GenericKeyPair(0L, "val"), "hello") }
                 .join()
 
-        assertThat(tree.asSequence().join().toList().joinToString(separator = "") { it.second }, equalTo("hello, world"))
-        assertThat(BalancedStorageTree<Int, String>(storage = storageLayer, type = "mytree")
-                .asSequence().join().toList().joinToString(separator = "") { it.second }, equalTo("hello, world"))
+        assertThat(tree.asSequence().join().toList().reversed().joinToString(separator = "") { it.second }, equalTo("hello, world"))
+        assertThat(BalancedStorageTree<GenericKeyPair<Long,String>, String>(storage = storageLayer, type = "mytree")
+                .asSequence().join().toList().reversed().joinToString(separator = "") { it.second }, equalTo("hello, world"))
 
 
     }
