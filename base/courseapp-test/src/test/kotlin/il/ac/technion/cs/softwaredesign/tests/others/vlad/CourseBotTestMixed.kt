@@ -10,7 +10,6 @@ import il.ac.technion.cs.softwaredesign.exceptions.UserNotAuthorizedException
 import il.ac.technion.cs.softwaredesign.messages.MediaType
 import il.ac.technion.cs.softwaredesign.messages.Message
 import il.ac.technion.cs.softwaredesign.messages.MessageFactory
-import il.ac.technion.cs.softwaredesign.tests.TestModule
 import il.ac.technion.cs.softwaredesign.tests.joinException
 import il.ac.technion.cs.softwaredesign.tests.runWithTimeout
 import org.junit.jupiter.api.AfterEach
@@ -20,7 +19,7 @@ import org.junit.jupiter.api.assertThrows
 import java.time.Duration
 
 class CourseBotTestMixed {
-    private val injector = Guice.createInjector(CourseAppModule(), CourseBotModule(), TestModule())
+    private val injector = Guice.createInjector(CourseAppModule(), CourseBotModule(), VladTestModule())
 
     init {
         injector.getInstance<CourseAppInitializer>().setup().join()

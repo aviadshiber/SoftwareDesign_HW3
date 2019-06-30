@@ -1,6 +1,8 @@
 package il.ac.technion.cs.softwaredesign.lib.utils
 
+import com.google.gson.internal.LinkedTreeMap
 import com.google.gson.reflect.TypeToken
+import il.ac.technion.cs.softwaredesign.lib.db.dal.GenericKeyPair
 import il.ac.technion.cs.softwaredesign.lib.db.dal.GsonInstance
 import il.ac.technion.cs.softwaredesign.lib.utils.StorageTree.StorageNode.Companion.deserialize
 import il.ac.technion.cs.softwaredesign.storage.SecureStorage
@@ -91,8 +93,11 @@ open class StorageTree<K: Comparable<K>, V>(private val storage: CompletableFutu
                                 val type = object : TypeToken<Map<String, Any>>() {}.type
                                 val map: Map<String, Any>? = gson.fromJson(String(it), type)
                                 if (map != null) {
+                                    val key = map["k"] as LinkedTreeMap<Any, Any>
+                                    val p = GenericKeyPair((key["first"] as Int).toLong(),(key["second"] as String))
                                     val res = StorageNode(
-                                            key = map["k"] as K,
+                                            key = p as K,
+//                                            key = map["k"] as K,
                                             value = map["v"] as V,
                                             parentId = map["p"] as Int?,
                                             id = map["i"] as Int,

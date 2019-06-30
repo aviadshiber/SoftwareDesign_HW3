@@ -6,7 +6,6 @@ import com.google.inject.Injector
 import il.ac.technion.cs.softwaredesign.*
 import il.ac.technion.cs.softwaredesign.messages.MessageFactory
 import il.ac.technion.cs.softwaredesign.tests.FakeCourseApp
-import il.ac.technion.cs.softwaredesign.tests.TestModule
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeAll
 import java.util.logging.FileHandler
@@ -14,7 +13,7 @@ import java.util.logging.Level
 import java.util.logging.Logger
 
 open class CourseTest {
-    protected val injector: Injector = Guice.createInjector(CourseBotModule(), TestModule())
+    protected val injector: Injector = Guice.createInjector(CourseBotModule(), VladTestModule())
 
     init {
         injector.getInstance<CourseAppInitializer>().setup().join()
@@ -43,7 +42,7 @@ open class CourseTest {
     protected fun doReboot() {
         val courseAppBefore: CourseApp = courseApp
         bots.bots().join()
-        val injector: Injector = Guice.createInjector(CourseBotModule(), TestModule())
+        val injector: Injector = Guice.createInjector(CourseBotModule(), VladTestModule())
         courseApp = injector.getInstance()
         (courseApp as FakeCourseApp).restore(courseAppBefore as FakeCourseApp)
         bots = injector.getInstance()

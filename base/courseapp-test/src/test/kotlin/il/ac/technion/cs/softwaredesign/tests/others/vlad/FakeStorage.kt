@@ -1,9 +1,10 @@
-package il.ac.technion.cs.softwaredesign
+package il.ac.technion.cs.softwaredesign.tests.others.vlad
 
 import il.ac.technion.cs.softwaredesign.storage.SecureStorage
 import il.ac.technion.cs.softwaredesign.storage.SecureStorageFactory
 import java.nio.charset.Charset
 import java.util.concurrent.CompletableFuture
+import javax.inject.Singleton
 
 class FakeStorage(private val id: ByteArray) : SecureStorage {
     companion object {
@@ -29,6 +30,7 @@ class FakeStorage(private val id: ByteArray) : SecureStorage {
     }
 }
 
+@Singleton
 class FakeStorageFactory : SecureStorageFactory {
     companion object {
         val names = HashSet<ByteArray>()
