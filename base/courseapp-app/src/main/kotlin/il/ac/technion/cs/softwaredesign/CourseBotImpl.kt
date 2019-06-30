@@ -415,13 +415,17 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
         }
         return if (trigger != null) {
             val callback = buildTriggerCallback(trigger, r, action)
-            callbacksMap[key]?.clear() //there is only one trigger of that key so we clear if we have any other callbacks
-            putCallback(key, callback)
+            overrideCallback(key, callback)
             courseApp.addListener(bot.token, callback).thenApply { prev }
         } else {
             callbacksMap[key]?.clear()
             ImmediateFuture { prev }
         }
+    }
+
+    private fun overrideCallback(key: String, callback: ListenerCallback) {
+        callbacksMap[key]?.clear()
+        putCallback(key, callback)
     }
 
     private fun buildTriggerCallback(trigger: String?, r: Regex, action: (source: String, message: Message) -> CompletableFuture<Unit>): ListenerCallback {
