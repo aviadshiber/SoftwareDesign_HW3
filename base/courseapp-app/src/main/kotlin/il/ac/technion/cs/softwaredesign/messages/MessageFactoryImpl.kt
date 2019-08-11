@@ -1,28 +1,20 @@
 package il.ac.technion.cs.softwaredesign.messages
 
-import il.ac.technion.cs.softwaredesign.services.CourseBotApi
-import java.time.LocalDateTime
+import com.google.inject.Inject
+import il.ac.technion.cs.softwaredesign.IStorage
+import il.ac.technion.cs.softwaredesign.constants.EConstants.*
 import java.util.concurrent.CompletableFuture
-import javax.inject.Inject
 
-class MessageFactoryImpl @Inject constructor(private val courseBotApi: CourseBotApi) : MessageFactory {
-    companion object {
-        const val messageType = "_messageIdCounter"
+
+
+class MessageFactoryImpl @Inject constructor(private val dataStore : IStorage) : MessageFactory{
+
+    private fun getNextId(): Long{
+        return dataStore.incCounter(MESSAGES_COUNTER.ordinal)
     }
 
     override fun create(media: MediaType, contents: ByteArray): CompletableFuture<Message> {
-        return generateUniqueMessageId().thenApply {
-            MessageImpl(it, media = media, contents = contents, created = LocalDateTime.now(), received = null)
-        }
-    }
-
-    private fun generateUniqueMessageId(): CompletableFuture<Long> {
-        return courseBotApi.findCounter(messageType)
-                .thenCompose { currId ->
-                    if (currId == null)
-                        courseBotApi.createCounter(messageType).thenApply { 0L }
-                    else
-                        courseBotApi.updateCounter(messageType, currId.value + 1L).thenApply { it.value }
-                }
+        val messageId = getNextId()
+        return CompletableFuture.completedFuture(MessageImpl(dataStore,messageId,media,contents))
     }
 }

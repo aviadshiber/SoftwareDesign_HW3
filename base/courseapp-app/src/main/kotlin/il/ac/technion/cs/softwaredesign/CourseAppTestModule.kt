@@ -3,24 +3,26 @@ package il.ac.technion.cs.softwaredesign
 import com.authzee.kotlinguice4.KotlinModule
 import com.google.inject.Provides
 import com.google.inject.Singleton
-import il.ac.technion.cs.softwaredesign.annotations.DictionaryType
-import il.ac.technion.cs.softwaredesign.annotations.IndexGeneratorForChannelIds
+import il.ac.technion.cs.softwaredesign.annotations.*
 import il.ac.technion.cs.softwaredesign.constants.EConstants
 import il.ac.technion.cs.softwaredesign.messages.MessageFactory
 import il.ac.technion.cs.softwaredesign.messages.MessageFactoryImpl
+
 import il.ac.technion.cs.softwaredesign.storage.SecureStorage
 import il.ac.technion.cs.softwaredesign.storage.SecureStorageFactory
 import java.util.concurrent.CompletableFuture
 
-class CourseAppModule : KotlinModule() {
+class CourseAppTestModule : KotlinModule() {
+
     override fun configure() {
-        bind<CourseApp>().to<CourseAppImpl>().`in`<Singleton>()
-        bind<CourseAppInitializer>().to<CourseAppInitializerImpl>().`in`<Singleton>()
-        bind<CourseAppStatistics>().to<CourseAppStatisticsImpl>().`in`<Singleton>()
+        bind<CourseApp>().to<CourseAppImpl>()
+        bind<CourseAppInitializer>().to<CourseAppInitializerImpl>()
+        bind<CourseAppStatistics>().to<CourseAppStatisticsImpl>()
 
         bind<IStorage>().to<CStorageImpl>().`in`<Singleton>()
         bind<ICache>().to<CPerpetualICache>()
         bind<ICacheFactory>().to<CPerpetualCacheFactory>()
+        bind<SecureStorageFactory>().to<CFakeSecureStorageFactory>()
         bind<MessageFactory>().to<MessageFactoryImpl>()
     }
 
@@ -32,7 +34,7 @@ class CourseAppModule : KotlinModule() {
 
     @Singleton
     @Provides
-    fun provideSecureStorage(secureStorageFactory: SecureStorageFactory): CompletableFuture<SecureStorage> {
+    fun provideSecureStorage(secureStorageFactory: CFakeSecureStorageFactory): CompletableFuture<SecureStorage> {
         return secureStorageFactory.open("main".toBytes())
     }
 
