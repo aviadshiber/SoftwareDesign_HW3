@@ -6,6 +6,7 @@ import il.ac.technion.cs.softwaredesign.constants.EConstants
 import il.ac.technion.cs.softwaredesign.constants.EConstants.*
 import il.ac.technion.cs.softwaredesign.exceptions.*
 import il.ac.technion.cs.softwaredesign.messages.*
+import io.github.vjames19.futures.jdk8.ImmediateFuture
 import java.time.LocalDateTime.now
 import java.util.concurrent.CompletableFuture
 import java.util.regex.Pattern
@@ -74,10 +75,10 @@ class CourseAppImpl @Inject constructor(private val dataStore : IStorage,
     override fun login(username: String, password: String): CompletableFuture<String> {
         val userExists = userExists(username)
         if (userExists && !isCorrectPassword(username, password)) {
-            throw NoSuchEntityException()
+            return ImmediateFuture {throw NoSuchEntityException() }
         }
         if (userIsLoggedIn(username)) {
-            throw UserAlreadyLoggedInException()
+            return ImmediateFuture { throw UserAlreadyLoggedInException() }
         }
         dataStore.incCounter(ACTIVE_USERS_COUNTER.ordinal)
         dataStore.makeValid(IS_LOGGED_IN.ordinal, username)
@@ -95,7 +96,7 @@ class CourseAppImpl @Inject constructor(private val dataStore : IStorage,
 
     override fun logout(token: String):CompletableFuture<Unit>{
         if(!isTokenValid(token)){
-            throw InvalidTokenException()
+            return ImmediateFuture {  throw InvalidTokenException()}
         }
         val username = extractUsernameFromToken(token)
         dataStore.decCounter(ACTIVE_USERS_COUNTER.ordinal)
@@ -106,7 +107,7 @@ class CourseAppImpl @Inject constructor(private val dataStore : IStorage,
 
     override fun isUserLoggedIn(token: String, username: String): CompletableFuture<Boolean?> {
         if(!isTokenValid(token)){
-            throw InvalidTokenException()
+            return ImmediateFuture {throw InvalidTokenException()}
         }
         if(!userExists(username)) return CompletableFuture.completedFuture(null)
         if(userIsLoggedIn(username)) return CompletableFuture.completedFuture(true)
@@ -115,14 +116,14 @@ class CourseAppImpl @Inject constructor(private val dataStore : IStorage,
 
     override fun makeAdministrator(token: String, username: String):CompletableFuture<Unit> {
         if(!isTokenValid(token)){
-            throw InvalidTokenException()
+            return ImmediateFuture { throw InvalidTokenException() }
         }
         val user = extractUsernameFromToken(token)
         if(!dataStore.isValid(IS_ADMIN.ordinal,user)){
-            throw UserNotAuthorizedException()
+            return ImmediateFuture { throw UserNotAuthorizedException() }
         }
         if(!userExists(username)){
-            throw NoSuchEntityException()
+            return ImmediateFuture { throw NoSuchEntityException() }
         }
         dataStore.makeValid(IS_ADMIN.ordinal,username)
         return CompletableFuture.completedFuture(Unit)
@@ -198,16 +199,16 @@ class CourseAppImpl @Inject constructor(private val dataStore : IStorage,
 
     override fun channelJoin(token: String, channel: String):CompletableFuture<Unit>{
         if(!isTokenValid(token)){
-            throw InvalidTokenException()
+            return ImmediateFuture { throw InvalidTokenException()}
         }
         if(!isValidNameForChannel(channel)){
-            throw NameFormatException()
+            return ImmediateFuture { throw NameFormatException()}
         }
         val username = extractUsernameFromToken(token)
         val channelId : Int
 
         if(!channelExists(channel)){
-            if(!dataStore.isValid(IS_ADMIN.ordinal,username)) throw UserNotAuthorizedException()
+            if(!dataStore.isValid(IS_ADMIN.ordinal,username))  return ImmediateFuture {throw UserNotAuthorizedException() }
             channelsTime = dataStore.incCounter(CHANNELS_TIME.ordinal)
             channelId = addNewChannel(channel)
             dataStore.makeValid(IS_OPERATOR.ordinal,username,channel)
@@ -234,15 +235,15 @@ class CourseAppImpl @Inject constructor(private val dataStore : IStorage,
     }
     override fun channelPart(token: String, channel: String):CompletableFuture<Unit> {
         if(!isTokenValid(token)){
-            throw InvalidTokenException()
+            return ImmediateFuture { throw InvalidTokenException()}
         }
         if(!channelExists(channel)){
-            throw NoSuchEntityException()
+            return ImmediateFuture { throw NoSuchEntityException() }
         }
         val channelId = getChannelId(channel)
         val username = extractUsernameFromToken(token)
         if(!isUserMemberOfChannel(username,channelId)){
-            throw NoSuchEntityException()
+            return ImmediateFuture {throw NoSuchEntityException() }
         }
         removeUserFromChannel(username,channelId)
         dataStore.decCounter(CHANNEL_USERS_NUMBER.ordinal,channelId.toString())
@@ -253,37 +254,37 @@ class CourseAppImpl @Inject constructor(private val dataStore : IStorage,
 
     override fun channelMakeOperator(token: String, channel: String, username: String):CompletableFuture<Unit> {
         if(!isTokenValid(token)){
-            throw InvalidTokenException()
+            return ImmediateFuture {throw InvalidTokenException()}
         }
         if(!channelExists(channel)){
-            throw NoSuchEntityException()
+            return ImmediateFuture {throw NoSuchEntityException()}
         }
         val tokenUsername = extractUsernameFromToken(token)
         val isOperator = dataStore.isValid(IS_OPERATOR.ordinal,tokenUsername,channel)
         val isAdmin = dataStore.isValid(IS_ADMIN.ordinal,tokenUsername)
         if (!isOperator && !isAdmin)
-            throw UserNotAuthorizedException()
+            return ImmediateFuture {throw UserNotAuthorizedException()}
         if(isAdmin && !isOperator && username!=tokenUsername)
-            throw UserNotAuthorizedException()
+            return ImmediateFuture {throw UserNotAuthorizedException()}
         val channelId = getChannelId(channel)
         if(!isUserMemberOfChannel(tokenUsername,channelId))
-            throw UserNotAuthorizedException()
+            return ImmediateFuture {throw UserNotAuthorizedException()}
         if(!userExists(username)|| !isUserMemberOfChannel(username,channelId))
-            throw NoSuchEntityException()
+            return ImmediateFuture {throw NoSuchEntityException()}
         dataStore.makeValid(IS_OPERATOR.ordinal,username,channel)
-        return CompletableFuture.completedFuture(Unit)
+        return ImmediateFuture {}
     }
 
     override fun channelKick(token: String, channel: String, username: String) :CompletableFuture<Unit>{
         if(!isTokenValid(token)){
-            throw InvalidTokenException()
+            return ImmediateFuture {throw InvalidTokenException()}
         }
         if(!channelExists(channel)){
-            throw NoSuchEntityException()
+            return  ImmediateFuture {throw NoSuchEntityException()}
         }
         val tokenUsername = extractUsernameFromToken(token)
         val isOperator = dataStore.isValid(IS_OPERATOR.ordinal,tokenUsername,channel)
-        if(!isOperator) throw UserNotAuthorizedException()
+        if(!isOperator)  return ImmediateFuture {throw UserNotAuthorizedException()}
         val channelId = getChannelId(channel)
         if(!userExists(username)|| !isUserMemberOfChannel(username,channelId)) throw NoSuchEntityException()
         removeUserFromChannel(username,channelId)
@@ -299,14 +300,14 @@ class CourseAppImpl @Inject constructor(private val dataStore : IStorage,
 
     override fun isUserInChannel(token: String, channel: String, username: String): CompletableFuture<Boolean?>{
         if(!isTokenValid(token)){
-            throw InvalidTokenException()
+            return ImmediateFuture {throw  InvalidTokenException()}
         }
         if(!channelExists(channel)){
-            throw NoSuchEntityException()
+            return ImmediateFuture { throw NoSuchEntityException()}
         }
         val channelId = getChannelId(channel)
         if(!userIsAuthorized(token,channelId)) {
-            throw UserNotAuthorizedException()
+            return ImmediateFuture { throw UserNotAuthorizedException() }
         }
         if(!userExists(username)) return CompletableFuture.completedFuture(null)
         return CompletableFuture.completedFuture(isUserMemberOfChannel(username,channelId))
@@ -328,28 +329,28 @@ class CourseAppImpl @Inject constructor(private val dataStore : IStorage,
 
     override fun numberOfActiveUsersInChannel(token: String, channel: String): CompletableFuture<Long> {
         if(!isTokenValid(token)){
-            throw InvalidTokenException()
+            return ImmediateFuture {throw InvalidTokenException()}
         }
         if(!channelExists(channel)){
-            throw NoSuchEntityException()
+            return ImmediateFuture { throw NoSuchEntityException()}
         }
         val channelId = getChannelId(channel)
         if(!userIsAuthorized(token,channelId)) {
-            throw UserNotAuthorizedException()
+            return ImmediateFuture { throw UserNotAuthorizedException()}
         }
         return CompletableFuture.completedFuture(dataStore.getCounterValue(ACTIVE_USERS_COUNTER.ordinal,channelId.toString()))
     }
 
     override fun numberOfTotalUsersInChannel(token: String, channel: String): CompletableFuture<Long> {
         if(!isTokenValid(token)){
-            throw InvalidTokenException()
+            return ImmediateFuture { throw InvalidTokenException()}
         }
         if(!channelExists(channel)){
-            throw NoSuchEntityException()
+            return ImmediateFuture { throw NoSuchEntityException()}
         }
         val channelId = getChannelId(channel)
         if(!userIsAuthorized(token,channelId)) {
-            throw UserNotAuthorizedException()
+            return ImmediateFuture {throw UserNotAuthorizedException()}
         }
         return CompletableFuture.completedFuture(dataStore.getCounterValue(TOTAL_USERS.ordinal,channelId.toString()))
     }
@@ -368,7 +369,7 @@ class CourseAppImpl @Inject constructor(private val dataStore : IStorage,
 
     override fun addListener(token: String, callback: ListenerCallback): CompletableFuture<Unit> {
         if(!isTokenValid(token)){
-            throw InvalidTokenException()
+            return ImmediateFuture {throw InvalidTokenException() }
         }
         val username = extractUsernameFromToken(token)
         if(listeners[username]== null){
@@ -439,15 +440,15 @@ class CourseAppImpl @Inject constructor(private val dataStore : IStorage,
 
     override fun removeListener(token: String, callback: ListenerCallback): CompletableFuture<Unit> {
         if(!isTokenValid(token)){
-            throw InvalidTokenException()
+            return ImmediateFuture {throw InvalidTokenException() }
         }
         val username = extractUsernameFromToken(token)
         if(listeners[username]==null){
-            throw NoSuchEntityException()
+            return ImmediateFuture {throw NoSuchEntityException() }
         }
         val callBackExists = listeners[username]!!.remove(callback)
         if(!callBackExists) {
-            throw NoSuchEntityException()
+            return ImmediateFuture {throw NoSuchEntityException() }
         }
         return CompletableFuture.completedFuture(Unit)
     }
@@ -463,15 +464,15 @@ class CourseAppImpl @Inject constructor(private val dataStore : IStorage,
 
     override fun channelSend(token: String, channel: String, message: Message): CompletableFuture<Unit> {
         if(!isTokenValid(token)){
-            throw InvalidTokenException()
+            return ImmediateFuture {throw InvalidTokenException() }
         }
         if(!channelExists(channel)){
-            throw NoSuchEntityException()
+            return ImmediateFuture { throw NoSuchEntityException()}
         }
         val username = extractUsernameFromToken(token)
         val channelId = getChannelId(channel)
         if(!isUserMemberOfChannel(username,channelId)){
-            throw  UserNotAuthorizedException()
+            return ImmediateFuture { throw  UserNotAuthorizedException()}
         }
         dataStore.incCounter(CHANNEL_MESSAGES_COUNTER.ordinal)
         incChannelMessagesCounter(channelId)
@@ -506,12 +507,12 @@ class CourseAppImpl @Inject constructor(private val dataStore : IStorage,
 
     override fun broadcast(token: String, message: Message): CompletableFuture<Unit> {
         if(!isTokenValid(token)){
-            throw InvalidTokenException()
+            return ImmediateFuture { throw InvalidTokenException()}
         }
         val username = extractUsernameFromToken(token)
         val isAdmin = dataStore.isValid(IS_ADMIN.ordinal, username)
         if(!isAdmin){
-            throw UserNotAuthorizedException()
+            return ImmediateFuture {throw UserNotAuthorizedException()}
         }
         val source = "BROADCAST"
         val backedUpMessage = BackedUpMessageImpl(dataStore,message.id)
@@ -535,10 +536,10 @@ class CourseAppImpl @Inject constructor(private val dataStore : IStorage,
 
     override fun privateSend(token: String, user: String, message: Message): CompletableFuture<Unit> {
         if(!isTokenValid(token)){
-            throw InvalidTokenException()
+            return ImmediateFuture {throw InvalidTokenException()}
         }
         if(!userExists(user)){
-            throw NoSuchEntityException()
+            return ImmediateFuture {throw NoSuchEntityException()}
         }
         val tokenUser = extractUsernameFromToken(token)
         val source = "@$tokenUser"
@@ -573,17 +574,17 @@ class CourseAppImpl @Inject constructor(private val dataStore : IStorage,
 
     override fun fetchMessage(token: String, id: Long): CompletableFuture<Pair<String, Message>> {
         if(!isTokenValid(token)){
-            throw InvalidTokenException()
+            return ImmediateFuture {throw InvalidTokenException() }
         }
-        val message = getMessage(id) ?: throw NoSuchEntityException()
+        val message = getMessage(id) ?:  return ImmediateFuture {throw NoSuchEntityException()}
         val backedUpMessage = BackedUpMessageImpl(dataStore,id)
         val messageType = backedUpMessage.type
         if(messageType != MessageType.CHANNEL)
-            throw NoSuchEntityException()
+            return ImmediateFuture {throw NoSuchEntityException()}
         val username = extractUsernameFromToken(token)
         val channelId = getChannelId(backedUpMessage.destination!!)
         if(!isUserMemberOfChannel(username,channelId))
-            throw UserNotAuthorizedException()
+            return ImmediateFuture { throw UserNotAuthorizedException() }
         val source = backedUpMessage.source!!
         return CompletableFuture.completedFuture(Pair(source,message))
     }
