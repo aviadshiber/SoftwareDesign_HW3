@@ -25,6 +25,15 @@ val isFalse = equalTo(false)
 object GlobalUtils{
     internal val callbackMap = HashMap<String, ListenerCallback>()
 }
+private val charPool: List<Char> = ('a'..'z') + ('A'..'Z') + ('0'..'9')
+fun randomChannelName(): String {
+    val randomString = (1..5)
+            .map { i -> kotlin.random.Random.nextInt(0, charPool.size) }
+            .map(charPool::get)
+            .joinToString("");
+
+    return "#$randomString"
+}
 
 fun <T> containsElementsInOrder(vararg elements: T): Matcher<Collection<T>> {
     val perElementMatcher = object : Matcher.Primitive<Collection<T>>() {

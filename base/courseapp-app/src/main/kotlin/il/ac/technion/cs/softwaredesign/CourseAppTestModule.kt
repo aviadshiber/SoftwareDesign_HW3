@@ -15,6 +15,7 @@ import java.util.concurrent.CompletableFuture
 class CourseAppTestModule : KotlinModule() {
 
     override fun configure() {
+
         bind<CourseApp>().to<CourseAppImpl>()
         bind<CourseAppInitializer>().to<CourseAppInitializerImpl>()
         bind<CourseAppStatistics>().to<CourseAppStatisticsImpl>()

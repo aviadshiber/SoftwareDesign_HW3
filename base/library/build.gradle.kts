@@ -7,10 +7,10 @@ val mockkVersion: String? by extra
 
 dependencies {
     compile("il.ac.technion.cs.softwaredesign", "primitive-storage-layer", "1.2")
-
+    implementation("com.google.code.gson:gson:2.8.5")
     testCompile("org.junit.jupiter", "junit-jupiter-api", junitVersion)
     testCompile("org.junit.jupiter", "junit-jupiter-params", junitVersion)
     testCompile("com.natpryce", "hamkrest", hamkrestVersion)
-    testCompile("com.google.inject", "guice", guiceVersion)
-    testCompile("com.authzee.kotlinguice4", "kotlin-guice", kotlinGuiceVersion)
+    //testCompile("com.google.inject", "guice", guiceVersion)
+    //testCompile("com.authzee.kotlinguice4", "kotlin-guice", kotlinGuiceVersion)
 }
