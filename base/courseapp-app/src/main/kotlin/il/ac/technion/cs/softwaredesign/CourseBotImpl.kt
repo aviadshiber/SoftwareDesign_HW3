@@ -226,9 +226,14 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
         return { source: String, message: Message ->
             if (isChannelNameValid(source) && message.media == MediaType.TEXT && source.channelName == channelName) {
                 val key = GenericKeyPair(0L, source.sender)
-                lastSeenUserTreeWrapper.treeSearch(lastSeenTreeType, bot.name, key).thenCompose { timeString ->
-                    updateLastSeenForNewMessageFuture(key, timeString, message)
+                courseApp.isUserInChannel(bot.token, channelName, bot.name).thenCompose { isBotInChannel ->
+                    if (true == isBotInChannel) {
+                        lastSeenUserTreeWrapper.treeSearch(lastSeenTreeType, bot.name, key)
+                                .thenCompose { timeString -> updateLastSeenForNewMessageFuture(key, timeString, message) }
+                    } else ImmediateFuture { }
                 }
+
+
             } else {
                 ImmediateFuture { }
             }
@@ -240,12 +245,12 @@ class CourseBotImpl(private val bot: Bot, private val courseApp: CourseApp, priv
         return if (timeString == null) lastSeenUserTreeWrapper.treeInsert(lastSeenTreeType, bot.name, key, messageCreatedTimeInString).thenDispose()
         else {
 
-            if (isNewMessageByCreationTime(message, timeString.convertToLocalDateTime())) {
+            //if (isNewMessageByCreationTime(message, timeString.convertToLocalDateTime())) {
                 lastSeenUserTreeWrapper.treeRemove(lastSeenTreeType, bot.name, key)
                         .thenCompose { lastSeenUserTreeWrapper.treeInsert(lastSeenTreeType, bot.name, key, message.created.convertToString()) }.thenDispose()
-            } else {
+            /*} else {
                 ImmediateFuture { }
-            }
+            }*/
         }
     }
 
