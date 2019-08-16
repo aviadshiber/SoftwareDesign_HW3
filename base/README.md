@@ -1,8 +1,8 @@
 # CourseApp: Assignment 3
 
 ## Authors
-* Ron Yitzhak, 315722744
-* Aviad Shiber, 302935697
+* Ron Yitzhak
+* Aviad Shiber
 
 ### Previous assignment
 This assignment uses the code from the submission by: 315722744-302935697
