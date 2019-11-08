@@ -4,11 +4,6 @@
 * Ron Yitzhak
 * Aviad Shiber
 
-### Previous assignment
-This assignment uses the code from the submission by: 315722744-302935697
-
-(This is important for people who switched partners, but everyone needs to fill it out)
-
 ## Library selection
 This submission uses the library identified by the number: 2
 
